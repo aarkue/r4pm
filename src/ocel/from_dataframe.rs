@@ -129,18 +129,6 @@ pub fn df_to_ocel(dfs: OCEL2DataFramesRef) -> Result<OCEL, PolarsError> {
         .map(|c| c.to_string())
         .collect();
 
-    // Build column type lookups for proper OCEL type inference
-    let event_col_types: HashMap<String, String> = event_attr_cols
-        .iter()
-        .filter_map(|col| {
-            dfs.events
-                .column(col.as_str())
-                .ok()
-                .map(|c| (col.clone(), dtype_to_ocel_type(c.dtype())))
-        })
-        .collect();
-
-
     // Build E2O lookup: event_id -> [(object_id, qualifier)]
     let mut e2o_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
     for i in 0..dfs.e2o.height() {
