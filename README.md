@@ -1,13 +1,15 @@
 # r4pm
 
-Fast Python bindings for process mining with XES/OCEL event logs and process discovery algorithms.
+Python bindings for the Rust4PM Project: Process mining in Python with the speed of Rust
+
+This library provides basic import/export of XES/OCEL event data, as well as other exposed functionality from the [Rust4PM project](https://github.com/aarkue/rust4pm) (e.g., process discovery algorithms).
 
 ## Features
 
 - **Fast XES/OCEL Import/Export**: Efficient Rust-based import and export of `.xes`, `.xes.gz`, and OCEL2 (`.xml`/`.json`) files
 - **Auto-Generated Bindings**: All process_mining functions automatically exposed with full IDE support (autocomplete, type hints, docs)
 - **Registry System**: Manage data objects and convert between types as needed
-- **Polars DataFrames**: Native support for efficient data manipulation
+- **Polars DataFrames**: Polars facilitates the fast transfer of event data from Python to Rust and vice versa
 
 ## Quick Start
 
@@ -38,7 +40,7 @@ case_dfg = bindings.discover_dfg(event_log=log_id)
 
 ### Auto-Generated Bindings
 
-All functions from the `process_mining` Rust library are automatically discovered and exposed as Python functions with:
+All functions from the [`process_mining` Rust library](https://docs.rs/process_mining/) are automatically discovered and exposed as Python functions with:
 - **Full type hints** for IDE autocomplete
 - **Automatic documentation** from Rust docs
 - **Type validation** via JSON schemas
