@@ -3,8 +3,8 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "rustxes"
-description = "Rust-based XES/OCEL2 event log importer"
+name = "r4pm"
+description = "Rust-based Process Mining"
 readme="README.md"
 authors = [
   {name = "Aaron Küsters", email = "kuesters@pads.rwth-aachen.de"},
@@ -15,11 +15,21 @@ classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = [
+[project.optional-dependencies]
+polars = [
   'polars[pandas, pyarrow]',
 ]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+# Include type stub files in the wheel
+include = [
+    { path = "r4pm/*.py", format = "wheel" },
+    { path = "r4pm/*.pyi", format = "wheel" },
+    { path = "r4pm/py.typed", format = "wheel" },
+    { path = "r4pm/bindings/**/*.py", format = "wheel" },
+    { path = "r4pm/bindings/**/*.pyi", format = "wheel" },
+]
