@@ -5,32 +5,37 @@ use std::collections::HashMap;
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use polars::prelude::*;
 use process_mining::{
-    OCEL,
-    core::event_data::object_centric::{
-        OCELAttributeValue, OCELEvent, OCELEventAttribute, OCELObject, OCELObjectAttribute,
-        OCELRelationship, OCELType, OCELTypeAttribute,
-    },
+    OCEL, core::event_data::object_centric::{
+        OCELAttributeType, OCELAttributeValue, OCELEvent, OCELEventAttribute, OCELObject, OCELObjectAttribute, OCELRelationship, OCELType, OCELTypeAttribute
+    }
 };
 
-use crate::ocel::{OCEL2DataFrames, OCEL2DataFramesRef};
+use crate::ocel::{OCEL2DataFramesRef, OCEL_CHANGED_FIELD_KEY};
 
 use super::{
-    OCEL_EVENT_ID_KEY, OCEL_EVENT_TIMESTAMP_KEY, OCEL_EVENT_TYPE_KEY,
-    OCEL_OBJECT_ID_KEY, OCEL_OBJECT_ID_2_KEY, OCEL_OBJECT_TYPE_KEY,
-    OCEL_QUALIFIER_KEY,
+    OCEL_EVENT_ID_KEY, OCEL_EVENT_TIMESTAMP_KEY, OCEL_EVENT_TYPE_KEY, OCEL_OBJECT_ID_2_KEY,
+    OCEL_OBJECT_ID_KEY, OCEL_OBJECT_TYPE_KEY, OCEL_QUALIFIER_KEY,
 };
 
 /// Convert a Polars DataType to OCEL type string
 fn dtype_to_ocel_type(dtype: &DataType) -> String {
     match dtype {
         DataType::Boolean => "boolean".to_string(),
-        DataType::Int8 | DataType::Int16 | DataType::Int32 | DataType::Int64 |
-        DataType::UInt8 | DataType::UInt16 | DataType::UInt32 | DataType::UInt64 => "integer".to_string(),
+        DataType::Int8
+        | DataType::Int16
+        | DataType::Int32
+        | DataType::Int64
+        | DataType::UInt8
+        | DataType::UInt16
+        | DataType::UInt32
+        | DataType::UInt64 => "integer".to_string(),
         DataType::Float32 | DataType::Float64 => "float".to_string(),
         DataType::Datetime(_, _) | DataType::Date | DataType::Time => "time".to_string(),
-        DataType::String | DataType::Categorical(_, _) | DataType::Enum(_, _) => "string".to_string(),
+        DataType::String | DataType::Categorical(_, _) | DataType::Enum(_, _) => {
+            "string".to_string()
+        }
         DataType::Null => "string".to_string(), // Default null columns to string
-        _ => "string".to_string(), // Fallback for other types
+        _ => "string".to_string(),              // Fallback for other types
     }
 }
 
@@ -76,8 +81,12 @@ fn get_string(val: AnyValue) -> String {
 /// Extract timestamp from AnyValue as DateTime<FixedOffset>
 fn get_timestamp(val: AnyValue) -> DateTime<FixedOffset> {
     match val {
-        AnyValue::Datetime(nanos, TimeUnit::Nanoseconds, _) => Utc.timestamp_nanos(nanos).fixed_offset(),
-        AnyValue::Datetime(micros, TimeUnit::Microseconds, _) => Utc.timestamp_nanos(micros * 1000).fixed_offset(),
+        AnyValue::Datetime(nanos, TimeUnit::Nanoseconds, _) => {
+            Utc.timestamp_nanos(nanos).fixed_offset()
+        }
+        AnyValue::Datetime(micros, TimeUnit::Microseconds, _) => {
+            Utc.timestamp_nanos(micros * 1000).fixed_offset()
+        }
         AnyValue::Datetime(millis, TimeUnit::Milliseconds, _) => {
             Utc.timestamp_millis_opt(millis).unwrap().fixed_offset()
         }
@@ -86,29 +95,31 @@ fn get_timestamp(val: AnyValue) -> DateTime<FixedOffset> {
 }
 
 /// Convert DataFrames to OCEL structure
-/// 
-/// 
+///
+///
 /// # Returns
 /// OCEL structure
-pub fn df_to_ocel(
-    dfs: OCEL2DataFramesRef
-) -> Result<OCEL, PolarsError> {
+pub fn df_to_ocel(dfs: OCEL2DataFramesRef) -> Result<OCEL, PolarsError> {
     // Build event type set and object type set
     let mut event_types: HashMap<String, OCELType> = HashMap::new();
     let mut object_types: HashMap<String, OCELType> = HashMap::new();
-    
+
     // Get attribute columns (non-standard columns)
-    let event_attr_cols: Vec<String> = dfs.events
+    let event_attr_cols: Vec<String> = dfs
+        .events
         .get_column_names()
         .into_iter()
         .filter(|c| {
             let name = c.as_str();
-            name != OCEL_EVENT_ID_KEY && name != OCEL_EVENT_TYPE_KEY && name != OCEL_EVENT_TIMESTAMP_KEY
+            name != OCEL_EVENT_ID_KEY
+                && name != OCEL_EVENT_TYPE_KEY
+                && name != OCEL_EVENT_TIMESTAMP_KEY
         })
         .map(|c| c.to_string())
         .collect();
-    
-    let object_attr_cols: Vec<String> = dfs.objects
+
+    let object_attr_cols: Vec<String> = dfs
+        .objects
         .get_column_names()
         .into_iter()
         .filter(|c| {
@@ -117,26 +128,19 @@ pub fn df_to_ocel(
         })
         .map(|c| c.to_string())
         .collect();
-    
+
     // Build column type lookups for proper OCEL type inference
     let event_col_types: HashMap<String, String> = event_attr_cols
         .iter()
         .filter_map(|col| {
-            dfs.events.column(col.as_str()).ok().map(|c| {
-                (col.clone(), dtype_to_ocel_type(c.dtype()))
-            })
+            dfs.events
+                .column(col.as_str())
+                .ok()
+                .map(|c| (col.clone(), dtype_to_ocel_type(c.dtype())))
         })
         .collect();
-    
-    let object_col_types: HashMap<String, String> = object_attr_cols
-        .iter()
-        .filter_map(|col| {
-            dfs.objects.column(col.as_str()).ok().map(|c| {
-                (col.clone(), dtype_to_ocel_type(c.dtype()))
-            })
-        })
-        .collect();
-    
+
+
     // Build E2O lookup: event_id -> [(object_id, qualifier)]
     let mut e2o_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
     for i in 0..dfs.e2o.height() {
@@ -145,7 +149,7 @@ pub fn df_to_ocel(
         let qual = get_string(dfs.e2o.column(OCEL_QUALIFIER_KEY)?.get(i)?);
         e2o_map.entry(eid).or_default().push((oid, qual));
     }
-    
+
     // Build O2O lookup: object_id -> [(target_object_id, qualifier)]
     let mut o2o_map: HashMap<String, Vec<(String, String)>> = HashMap::new();
     for i in 0..dfs.o2o.height() {
@@ -154,14 +158,14 @@ pub fn df_to_ocel(
         let qual = get_string(dfs.o2o.column(OCEL_QUALIFIER_KEY)?.get(i)?);
         o2o_map.entry(oid).or_default().push((oid2, qual));
     }
-    
+
     // Build events
     let mut events: Vec<OCELEvent> = Vec::with_capacity(dfs.events.height());
     for i in 0..dfs.events.height() {
         let eid = get_string(dfs.events.column(OCEL_EVENT_ID_KEY)?.get(i)?);
         let activity = get_string(dfs.events.column(OCEL_EVENT_TYPE_KEY)?.get(i)?);
         let timestamp = get_timestamp(dfs.events.column(OCEL_EVENT_TIMESTAMP_KEY)?.get(i)?);
-        
+
         // Collect attributes
         let mut attributes: Vec<OCELEventAttribute> = Vec::new();
         for col in &event_attr_cols {
@@ -173,7 +177,7 @@ pub fn df_to_ocel(
                 });
             }
         }
-        
+
         // Get related objects as OCELRelationship
         let relationships: Vec<OCELRelationship> = e2o_map
             .get(&eid)
@@ -186,16 +190,30 @@ pub fn df_to_ocel(
                     .collect()
             })
             .unwrap_or_default();
-        
+
         // Track event type
-        event_types.entry(activity.clone()).or_insert_with(|| OCELType {
-            name: activity.clone(),
-            attributes: event_attr_cols.iter().map(|c| OCELTypeAttribute {
-                name: c.clone(),
-                value_type: event_col_types.get(c).cloned().unwrap_or_else(|| "string".to_string()),
-            }).collect(),
-        });
-        
+        if !event_types.contains_key(&activity) {
+            event_types.insert(
+                activity.clone(),
+                OCELType {
+                    name: activity.clone(),
+                    attributes: vec![],
+                },
+            );
+        }
+        if let Some(et) = event_types.get_mut(&activity) {
+            let attr_names: HashMap<&String,OCELAttributeType> = attributes.iter().map(|a| (&a.name,a.value.get_type())).collect();
+            for (name,attr_type) in attr_names {
+                if !et.attributes.iter().any(|a| &a.name == name) {
+                    et.attributes.push(OCELTypeAttribute {
+                        name: name.clone(),
+                        value_type: attr_type.to_type_string(),
+                    });
+                }
+            }
+
+        }
+
         events.push(OCELEvent {
             id: eid,
             event_type: activity,
@@ -204,13 +222,39 @@ pub fn df_to_ocel(
             relationships,
         });
     }
-    
+
     // Build objects
+
+    // First gather object attribute changes
+
+    // Get object changes from object_changes DataFrame
+    let mut object_attr_changes: HashMap<String, Vec<OCELObjectAttribute>> = HashMap::new();
+    for j in 0..dfs.object_changes.height() {
+        let change_oid = get_string(dfs.object_changes.column(OCEL_OBJECT_ID_KEY)?.get(j)?);
+        let field = get_string(dfs.object_changes.column(OCEL_CHANGED_FIELD_KEY)?.get(j)?);
+        let val = dfs.object_changes.column(&field)?.get(j)?;
+        let timestamp = get_timestamp(
+            dfs.object_changes
+                .column(OCEL_EVENT_TIMESTAMP_KEY)?
+                .get(j)?,
+        );
+        if !object_attr_changes.contains_key(&change_oid) {
+            object_attr_changes.insert(change_oid.clone(), Vec::new());
+        }
+        if let Some(attrs) = object_attr_changes.get_mut(&change_oid) {
+            attrs.push(OCELObjectAttribute {
+                name: field,
+                value: any_value_to_ocel_attr(val),
+                time: timestamp,
+            });
+        }
+    }
+
     let mut objects: Vec<OCELObject> = Vec::with_capacity(dfs.objects.height());
     for i in 0..dfs.objects.height() {
         let oid = get_string(dfs.objects.column(OCEL_OBJECT_ID_KEY)?.get(i)?);
         let obj_type = get_string(dfs.objects.column(OCEL_OBJECT_TYPE_KEY)?.get(i)?);
-        
+
         // Collect attributes (as initial attributes at UNIX_EPOCH)
         let mut attributes: Vec<OCELObjectAttribute> = Vec::new();
         for col in &object_attr_cols {
@@ -223,7 +267,12 @@ pub fn df_to_ocel(
                 });
             }
         }
-        
+
+        // Append previously collected attribute changes
+        if let Some(changes) = object_attr_changes.remove(&oid) {
+            attributes.extend(changes);
+        }
+
         // Get O2O relationships
         let relationships: Vec<OCELRelationship> = o2o_map
             .get(&oid)
@@ -236,16 +285,30 @@ pub fn df_to_ocel(
                     .collect()
             })
             .unwrap_or_default();
-        
+
         // Track object type
-        object_types.entry(obj_type.clone()).or_insert_with(|| OCELType {
-            name: obj_type.clone(),
-            attributes: object_attr_cols.iter().map(|c| OCELTypeAttribute {
-                name: c.clone(),
-                value_type: object_col_types.get(c).cloned().unwrap_or_else(|| "string".to_string()),
-            }).collect(),
-        });
-        
+        if !object_types.contains_key(&obj_type) {
+            object_types.insert(
+                obj_type.clone(),
+                OCELType {
+                    name: obj_type.clone(),
+                    attributes: vec![],
+                },
+            );
+        }
+        if let Some(ot) = object_types.get_mut(&obj_type) {
+            let attr_names: HashMap<&String,OCELAttributeType> = attributes.iter().map(|a| (&a.name,a.value.get_type())).collect();
+            for (name,attr_type) in attr_names {
+                if !ot.attributes.iter().any(|a| &a.name == name) {
+                    ot.attributes.push(OCELTypeAttribute {
+                        name: name.clone(),
+                        value_type: attr_type.to_type_string(),
+                    });
+                }
+            }
+
+        }
+
         objects.push(OCELObject {
             id: oid,
             object_type: obj_type,
@@ -253,7 +316,7 @@ pub fn df_to_ocel(
             relationships,
         });
     }
-    
+
     Ok(OCEL {
         event_types: event_types.into_values().collect(),
         object_types: object_types.into_values().collect(),

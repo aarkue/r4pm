@@ -2,7 +2,7 @@ use polars::frame::DataFrame;
 use process_mining::{core::io::Importable, Exportable, OCEL};
 use pyo3::{exceptions::PyTypeError, pyfunction, PyResult};
 use pyo3_polars::PyDataFrame;
-use std::{collections::HashMap, fmt::format};
+use std::collections::HashMap;
 
 pub mod to_dataframe;
 pub use to_dataframe::{ocel2_to_df, ocel_dfs_to_py};
