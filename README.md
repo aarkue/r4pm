@@ -86,28 +86,28 @@ for item in r4pm.list_items():
 
 ## Simple Import/Export API
 
-For direct DataFrame operations without the registry:
+For direct DataFrame operations without the registry, use the `df` submodule.
 
 ### XES
 ```python
 import r4pm
 
 # Import returns (DataFrame, log_attributes_json)
-xes, attrs = r4pm.import_xes("file.xes", date_format="%Y-%m-%d")
-r4pm.export_xes(xes, "test_data/output.xes")
+xes, attrs = r4pm.df.import_xes("file.xes", date_format="%Y-%m-%d")
+r4pm.df.export_xes(xes, "test_data/output.xes")
 ```
 
 ### OCEL
 ```python
 # Returns dict with DataFrames: events, objects, relations, o2o, object_changes
-ocel = r4pm.import_ocel("file.xml")
+ocel = r4pm.df.import_ocel("file.xml")
 print(ocel['events'].shape)
-r4pm.export_ocel(ocel, "export.xml")
+r4pm.df.export_ocel(ocel, "export.xml")
 
 # PM4Py integration (requires pm4py)
-ocel_pm4py = r4pm.import_ocel_pm4py("file.xml")
+ocel_pm4py = r4pm.df.import_ocel_pm4py("file.xml")
 print(ocel['events'].shape)
-r4pm.export_ocel_pm4py(ocel_pm4py, "export.xml")
+r4pm.df.export_ocel_pm4py(ocel_pm4py, "export.xml")
 ```
 
 ## Development
@@ -158,7 +158,7 @@ The test suite (`test_all.py`) covers:
 - Automatic type conversion (positional & keyword arguments)
 - Process discovery (DFG, OC-Declare)
 - Registry operations (CRUD, DataFrames, export)
-- Simple Import/Export DataFrame API
+- Simple Import/Export DataFrame (`df`) API
 - Edge cases and conversion caching
 
 

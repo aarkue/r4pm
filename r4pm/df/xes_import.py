@@ -1,7 +1,7 @@
 from typing import Optional
 import polars
 
-from .r4pm import import_xes_rs
+from ..r4pm import import_xes_rs
 
 def import_xes(path: str, date_format: Optional[str] = None, print_debug: Optional[bool] = None) -> tuple[polars.DataFrame, str]:
     """

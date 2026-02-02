@@ -27,9 +27,11 @@ polars = [
 features = ["pyo3/extension-module"]
 # Include type stub files in the wheel
 include = [
+    { path = "r4pm/py.typed", format = "wheel" },
     { path = "r4pm/*.py", format = "wheel" },
     { path = "r4pm/*.pyi", format = "wheel" },
-    { path = "r4pm/py.typed", format = "wheel" },
+    { path = "r4pm/df/*.py", format = "wheel" },
+    { path = "r4pm/df/*.pyi", format = "wheel" },
     { path = "r4pm/bindings/**/*.py", format = "wheel" },
     { path = "r4pm/bindings/**/*.pyi", format = "wheel" },
 ]

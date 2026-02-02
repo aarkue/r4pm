@@ -1,6 +1,6 @@
 import polars
 
-from .r4pm import export_ocel_rs
+from ..r4pm import export_ocel_rs
 
 def export_ocel(ocel: dict[str, polars.DataFrame], path: str):
     """

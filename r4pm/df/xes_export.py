@@ -1,6 +1,6 @@
 import polars
 
-from .r4pm import export_xes_rs
+from ..r4pm import export_xes_rs
 
 def export_xes(df: polars.DataFrame, path: str):
     """

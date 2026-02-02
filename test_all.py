@@ -129,19 +129,19 @@ def test_simple_import_export_api():
     print("="*60)
     
     # XES import/export
-    xes, attrs = r4pm.import_xes('test.xes')
+    xes, attrs = r4pm.df.import_xes('test.xes')
     print(f"✓ Imported XES: {xes.shape}")
     
-    r4pm.export_xes(xes, '/tmp/test-export.xes')
+    r4pm.df.export_xes(xes, '/tmp/test-export.xes')
     print(f"✓ Exported XES")
     
     # Verify round-trip
-    xes2, _ = r4pm.import_xes('/tmp/test-export.xes')
+    xes2, _ = r4pm.df.import_xes('/tmp/test-export.xes')
     assert xes.shape == xes2.shape
     print(f"✓ Round-trip successful")
     
     # OCEL import
-    ocel = r4pm.import_ocel_xml('test_data/order-management.xml')
+    ocel = r4pm.df.import_ocel_xml('test_data/order-management.xml')
     assert 'events' in ocel and 'objects' in ocel
     print(f"✓ Imported OCEL: events={ocel['events'].shape}, objects={ocel['objects'].shape}")
     print()

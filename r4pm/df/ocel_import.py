@@ -1,6 +1,6 @@
 import polars as pl
 
-from .r4pm import import_ocel_xml_rs, import_ocel_json_rs, import_ocel_rs
+from ..r4pm import import_ocel_xml_rs, import_ocel_json_rs, import_ocel_rs
 
 def rs_ocel_to_pm4py(ocel_rs: dict[str, pl.DataFrame]):
     """
