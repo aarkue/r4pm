@@ -17,9 +17,9 @@ def test_basic_workflow():
     ocel_id = r4pm.import_item('OCEL', 'test_data/order-management.xml')
     print(f"✓ Loaded OCEL: {ocel_id[:30]}...")
     
-    # Convert to IndexLinkedOCEL
-    locel_id = bindings.index_link_ocel(ocel=ocel_id)
-    print(f"✓ Converted to IndexLinkedOCEL: {locel_id[:30]}...")
+    # Convert to SlimLinkedOCEL
+    locel_id = bindings.slim_link_ocel(ocel=ocel_id)
+    print(f"✓ Converted to SlimLinkedOCEL: {locel_id[:30]}...")
     
     # Use analysis functions
     num = bindings.num_events(ocel=locel_id)
@@ -34,7 +34,7 @@ def test_basic_workflow():
     items = r4pm.list_items()
     assert len(items) == 2, f"Expected 2 items, got {len(items)}"
     types = {item['type'] for item in items}
-    assert 'OCEL' in types and 'IndexLinkedOCEL' in types, f"Wrong types: {types}"
+    assert 'OCEL' in types and 'SlimLinkedOCEL' in types, f"Wrong types: {types}"
     print(f"✓ Registry has {len(items)} items: {', '.join(types)}")
     
     # Cleanup
@@ -51,10 +51,10 @@ def test_process_discovery():
     
     # Load and convert OCEL
     ocel_id = r4pm.import_item('OCEL', 'test_data/order-management.xml')
-    locel_id = bindings.index_link_ocel(ocel=ocel_id)
+    ocel_id = bindings.slim_link_ocel(ocel_id)
     
-    # DFG from IndexLinkedOCEL
-    dfg = bindings.discover_dfg_from_locel(locel=locel_id)
+    # DFG from SlimLinkedOCEL
+    dfg = bindings.discover_dfg_from_ocel(ocel_id)
     object_types = list(dfg['object_type_to_dfg'].keys())
     print(f"✓ DFG discovered for {len(object_types)} object types")
     print(f"  Types: {', '.join(object_types)}")
@@ -97,9 +97,9 @@ def test_registry_operations():
     print(f"✓ Loaded with custom ID: {ocel_id}")
     
     # Convert
-    linked_id = r4pm.convert_item(ocel_id, 'IndexLinkedOCEL', 'my-linked')
+    linked_id = r4pm.convert_item(ocel_id, 'SlimLinkedOCEL', 'my-linked')
     assert linked_id == 'my-linked', f"Custom conversion ID failed: {linked_id}"
-    print(f"✓ Converted to IndexLinkedOCEL: {linked_id}")
+    print(f"✓ Converted to SlimLinkedOCEL: {linked_id}")
     
     # Get as DataFrames
     dfs = r4pm.item_to_df(ocel_id)
@@ -159,7 +159,7 @@ def test_edge_cases():
     print(f"✓ Auto-generated ID: {ocel_id}")
     
     # Convert and verify
-    locel_id = bindings.index_link_ocel(ocel=ocel_id)
+    locel_id = bindings.slim_link_ocel(ocel=ocel_id)
     num1 = bindings.num_events(ocel=locel_id)
     num2 = bindings.num_events(ocel=locel_id)
     assert num1 == num2

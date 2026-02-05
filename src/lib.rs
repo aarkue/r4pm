@@ -8,6 +8,7 @@ use process_mining::core::event_data::case_centric::{
     dataframe::{convert_dataframe_to_log, convert_log_to_dataframe},
     xes::{export_xes_event_log_to_path, import_xes_path, XESImportOptions, XESOuterLogData},
 };
+use process_mining::core::event_data::object_centric::linked_ocel::LinkedOCELAccess;
 use pyo3::{
     exceptions::PyTypeError,
     prelude::*,
@@ -345,12 +346,20 @@ fn item_to_df(item_id: String, py: Python<'_>) -> PyResult<PyObject> {
         RegistryItem::OCEL(ocel) => {
             let ocel_dfs = crate::ocel::ocel2_to_df(ocel);
             let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
-            let py_dict = PyDict::new(py);
-            for (k, v) in result_map {
-                py_dict.set_item(k, v.into_pyobject(py)?)?;
-            }
-            Ok(py_dict.into_any().unbind())
-        }
+            Ok(result_map.into_pyobject(py)?.into_any().unbind())
+        },
+        RegistryItem::IndexLinkedOCEL(locel) => {
+            // TODO: Optimize ocel2_to_df to only take LinkedOCELAccess
+            let ocel_dfs = crate::ocel::ocel2_to_df(&locel.construct_ocel());
+            let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
+            Ok(result_map.into_pyobject(py)?.into_any().unbind())
+        },
+        RegistryItem::SlimLinkedOCEL(locel) => {
+            // TODO: Optimize ocel2_to_df to only take LinkedOCELAccess
+            let ocel_dfs = crate::ocel::ocel2_to_df(&locel.construct_ocel());
+            let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
+            Ok(result_map.into_pyobject(py)?.into_any().unbind())
+        },
         _ => Err(PyTypeError::new_err(
             "This item type cannot be converted to DataFrame",
         )),

@@ -17,28 +17,6 @@ use super::{
     OCEL_OBJECT_ID_KEY, OCEL_OBJECT_TYPE_KEY, OCEL_QUALIFIER_KEY,
 };
 
-/// Convert a Polars DataType to OCEL type string
-fn dtype_to_ocel_type(dtype: &DataType) -> String {
-    match dtype {
-        DataType::Boolean => "boolean".to_string(),
-        DataType::Int8
-        | DataType::Int16
-        | DataType::Int32
-        | DataType::Int64
-        | DataType::UInt8
-        | DataType::UInt16
-        | DataType::UInt32
-        | DataType::UInt64 => "integer".to_string(),
-        DataType::Float32 | DataType::Float64 => "float".to_string(),
-        DataType::Datetime(_, _) | DataType::Date | DataType::Time => "time".to_string(),
-        DataType::String | DataType::Categorical(_, _) | DataType::Enum(_, _) => {
-            "string".to_string()
-        }
-        DataType::Null => "string".to_string(), // Default null columns to string
-        _ => "string".to_string(),              // Fallback for other types
-    }
-}
-
 /// Convert a Polars AnyValue to OCELAttributeValue
 fn any_value_to_ocel_attr(val: AnyValue) -> OCELAttributeValue {
     match val {

@@ -20,20 +20,20 @@ import r4pm
 # Load an OCEL file - returns a registry ID
 ocel_id = r4pm.import_item('OCEL', 'data/orders.xml')
 
-# Convert to IndexLinkedOCEL for analysis functions
-locel_id = bindings.index_link_ocel(ocel=ocel_id)
+# Convert to SlimLinkedOCEL for analysis functions
+locel_id = bindings.slim_link_ocel(ocel=ocel_id)
 
 # Get statistics
 num = bindings.num_events(ocel=locel_id)
 print(f"Events: {num}")
 
 # Discover object-centric DFG
-dfg = bindings.discover_dfg_from_locel(locel=locel_id)
+dfg = bindings.discover_dfg_from_ocel(locel_id)
 print(f"Discovered DFG for {len(dfg['object_type_to_dfg'])} object types")
 
 # For case-centric event logs:
 log_id = r4pm.import_item('EventLog', 'data/log.xes')
-case_dfg = bindings.discover_dfg(event_log=log_id)
+case_dfg = bindings.discover_dfg(log_id)
 ```
 
 ## How It Works
@@ -64,8 +64,8 @@ Bindings are automatically generated during the Rust build via `build.rs`.
 
 Data is managed through a registry that holds different object types:
 - `OCEL` - Raw OCEL data
-- `IndexLinkedOCEL` - Indexed OCEL for analysis (required by most functions)
-- `SlimLinkedOCEL` - Memory-efficient linked OCEL
+- `SlimLinkedOCEL` - Memory-efficient linked OCEL (required by most functions)
+- `IndexLinkedOCEL` - Indexed OCEL for analysis
 - `EventLog` - Case-centric event log
 - `EventLogActivityProjection` - Activity-projected log for discovery
 
@@ -74,7 +74,7 @@ Data is managed through a registry that holds different object types:
 ocel_id = r4pm.import_item('OCEL', 'file.xml')
 log_id = r4pm.import_item('EventLog', 'file.xes')
 
-# Convert between types
+# Convert between types (either like this or using r4pm.convert_item)
 locel_id = bindings.index_link_ocel(ocel=ocel_id)
 proj_id = bindings.log_to_activity_projection(log=log_id)
 

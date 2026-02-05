@@ -16,11 +16,11 @@ print(f"\n✓ Loaded OCEL: {ocel_id[:30]}...")
 
 # Convert to IndexLinkedOCEL for analysis
 print("\n🔄 Converting to IndexLinkedOCEL...")
-locel_id = bindings.index_link_ocel(ocel=ocel_id)
-print(f"✓ Created: {locel_id[:30]}...")
+ocel_id = bindings.slim_link_ocel(ocel_id)
+print(f"✓ Created: {ocel_id[:30]}...")
 
 # Get statistics
-num = bindings.num_events(ocel=locel_id)
+num = bindings.num_events(ocel_id)
 print(f"✅ Number of events: {num}")
 
 # Check what's in the registry now
@@ -31,7 +31,7 @@ for item in items:
 
 # Process discovery
 print("\n🔍 Discovering DFG...")
-dfg = bindings.discover_dfg_from_locel(locel=locel_id)
+dfg = bindings.discover_dfg_from_ocel(ocel_id)
 object_types = list(dfg['object_type_to_dfg'].keys())
 print(f"✓ DFG discovered for {len(object_types)} object types: {', '.join(object_types)}")
 
