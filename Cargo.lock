@@ -1338,7 +1338,7 @@ dependencies = [
 [[package]]
 name = "macros_process_mining"
 version = "0.1.0"
-source = "git+https://github.com/aarkue/rust4pm?branch=feat%2Fmore-bindings#375e994e9e0624893f478bd41553a0b63a9a6990"
+source = "git+https://github.com/aarkue/rust4pm?branch=main#f02a25828a3290a93066527dd1a3bae7d8af9524"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2144,8 +2144,8 @@ dependencies = [
 
 [[package]]
 name = "process_mining"
-version = "0.4.0"
-source = "git+https://github.com/aarkue/rust4pm?branch=feat%2Fmore-bindings#375e994e9e0624893f478bd41553a0b63a9a6990"
+version = "0.4.3"
+source = "git+https://github.com/aarkue/rust4pm?branch=main#f02a25828a3290a93066527dd1a3bae7d8af9524"
 dependencies = [
  "chrono",
  "csv",
@@ -2346,7 +2346,7 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "r4pm"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "chrono",
  "inventory",
