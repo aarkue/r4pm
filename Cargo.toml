@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 build = "build.rs"
 
@@ -10,7 +10,7 @@ name = "r4pm"
 crate-type = ["cdylib"]
 
 [dependencies]
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], git = "https://github.com/aarkue/rust4pm", branch = "main"}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.4.4"}
 pyo3 = {version = "0.25", features = [ "extension-module"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
@@ -23,4 +23,4 @@ inventory = "0.3"
 
 [build-dependencies]
 serde_json = "1.0"
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], git = "https://github.com/aarkue/rust4pm", branch = "main"}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.4.4"}
