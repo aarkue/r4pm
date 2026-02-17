@@ -44,9 +44,27 @@ fn main() {
 
     // println!("cargo:warning=Generating bindings for {} modules", module_groups.len());
 
+    // Compute which modules are also parents of other modules
+    // (e.g., "bindings" is a parent if "bindings.slim_ocel_bindings" also exists)
+    // These need special handling to avoid file/directory name collisions in Python
+    let parent_modules: BTreeSet<String> = module_groups
+        .keys()
+        .filter(|path| {
+            module_groups
+                .keys()
+                .any(|other| other != *path && other.starts_with(&format!("{}.", path)))
+        })
+        .cloned()
+        .collect();
+
     // Generate module files
     for (module_path, funcs) in &module_groups {
-        generate_module_files(&bindings_dir, module_path, funcs);
+        generate_module_files(
+            &bindings_dir,
+            module_path,
+            funcs,
+            parent_modules.contains(module_path),
+        );
     }
 
     // Generate intermediate __init__.py files
@@ -347,19 +365,33 @@ fn sanitize_name(name: &str) -> String {
 }
 
 /// Generate .py and .pyi files for a module
-fn generate_module_files(bindings_dir: &Path, module_path: &str, functions: &[BindingMeta]) {
+fn generate_module_files(
+    bindings_dir: &Path,
+    module_path: &str,
+    functions: &[BindingMeta],
+    is_package_parent: bool,
+) {
     let parts: Vec<&str> = module_path.split('.').collect();
-    let import_depth = parts.len() + 1;
+    // +1 for the bindings_dir level; +1 more if written to _impl.py inside a package dir
+    let import_depth = parts.len() + 1 + if is_package_parent { 1 } else { 0 };
 
     // Create directory structure
-    let module_dir = if parts.len() > 1 {
-        bindings_dir.join(parts[..parts.len() - 1].join("/"))
+    // When a module is also a parent of submodules (is_package_parent), we can't write
+    // a `foo.py` file because a `foo/` directory will also be created for the submodules,
+    // and the directory shadows the file in Python. Instead, write to `foo/_impl.py`.
+    let (module_dir, file_name) = if is_package_parent {
+        let dir = bindings_dir.join(parts.join("/"));
+        fs::create_dir_all(&dir).expect("Failed to create module directory");
+        (dir, "_impl".to_string())
     } else {
-        bindings_dir.to_path_buf()
+        let dir = if parts.len() > 1 {
+            bindings_dir.join(parts[..parts.len() - 1].join("/"))
+        } else {
+            bindings_dir.to_path_buf()
+        };
+        fs::create_dir_all(&dir).expect("Failed to create module directory");
+        (dir, parts.last().unwrap().to_string())
     };
-    fs::create_dir_all(&module_dir).expect("Failed to create module directory");
-
-    let file_name = parts.last().unwrap();
 
     // Get the Rust module path for docs URL
     let rust_module = format!("process_mining::{}", module_path.replace('.', "::"));
@@ -696,6 +728,11 @@ fn generate_submodule_inits(
             init_content.push_str(&format!("from .{} import *\n", file_mod));
         }
 
+        // If this directory also has direct functions (written to _impl.py), re-export them
+        if target_dir.join("_impl.py").exists() {
+            init_content.push_str("from ._impl import *\n");
+        }
+
         init_content.push_str(&format!("\n__all__ = {:?}\n", all_items));
 
         fs::write(target_dir.join("__init__.py"), &init_content)
@@ -708,6 +745,11 @@ fn generate_submodule_inits(
         }
         for file_mod in files {
             stub_content.push_str(&format!("from .{} import *\n", file_mod));
+        }
+
+        // If this directory also has direct functions (written to _impl.pyi), re-export them
+        if target_dir.join("_impl.pyi").exists() {
+            stub_content.push_str("from ._impl import *\n");
         }
 
         // Generate explicit __all__ list
