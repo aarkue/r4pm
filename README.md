@@ -1,70 +1,165 @@
-# rustxes
-A Python package to efficiently import XES or OCEL2 event logs using Rust.
+# r4pm
 
-For traditional event data, it supports parsing data both from `.xes` XML files and `.xes.gz` archives (and also from strings directly if needed). 
+Python bindings for the Rust4PM Project: Process mining in Python with the speed of Rust
 
-For object-centric event data, it supports parsing OCEL2 XML or JSON files (`.xml` or `.json`).
+This library provides basic import/export of XES/OCEL event data, as well as other exposed functionality from the [Rust4PM project](https://github.com/aarkue/rust4pm) (e.g., process discovery algorithms).
 
+## Features
 
+- **Fast XES/OCEL Import/Export**: Efficient Rust-based import and export of `.xes`, `.xes.gz`, and OCEL2 (`.xml`/`.json`) files
+- **Auto-Generated Bindings**: All process_mining functions automatically exposed with full IDE support (autocomplete, type hints, docs)
+- **Registry System**: Manage data objects and convert between types as needed
+- **Polars DataFrames**: Polars facilitates the fast transfer of event data from Python to Rust and vice versa
 
-## Usage
-### XES Import
-
-The `import_xes` returns a tuple of 1) the XES log polars dataframe and 2) JSON-encoding of global log attributes.
-
-```python
-import rustxes
-
-[xes,log_attrs_json] = rustxes.import_xes("path/to/file.xes")
-print(xes.shape)
-```
-
-#### Options
-The following parameters can be passed to the `import_xes_rs` or the python wrapper (`import_xes`):
-- `path` - The filepath of the .xes or .xes.gz file to import
-- `date_format` - Optional date format to use for parsing `<date>` tags (See https://docs.rs/chrono/latest/chrono/format/strftime/index.html)
-- `print_debug` - Optional flag to enable debug print outputs
-
-
-### XES Export
-
-The `export_xes` exports the passed polars DataFrame to the given path (either `.xes` or `.xes.gz`).
+## Quick Start
 
 ```python
-import rustxes
+from r4pm import bindings
+import r4pm
 
-[xes,log_attrs_json] = rustxes.import_xes("path/to/file.xes")
-rustxes.export_xes(xes,"path/to/export-file.xes")
+# Load an OCEL file - returns a registry ID
+ocel_id = r4pm.import_item('OCEL', 'data/orders.xml')
+
+# Convert to SlimLinkedOCEL for analysis functions
+locel_id = bindings.slim_link_ocel(ocel=ocel_id)
+
+# Get statistics
+num = bindings.num_events(ocel=locel_id)
+print(f"Events: {num}")
+
+# Discover object-centric DFG
+dfg = bindings.discover_dfg_from_ocel(locel_id)
+print(f"Discovered DFG for {len(dfg['object_type_to_dfg'])} object types")
+
+# For case-centric event logs:
+log_id = r4pm.import_item('EventLog', 'data/log.xes')
+case_dfg = bindings.discover_dfg(log_id)
 ```
 
-#### Options
-The following parameters can be passed to the `export_xes_rs` or the python wrapper (`export_xes`):
-- `df` - The polars DataFrame representing the event log
-- `path` - The filepath the .xes or .xes.gz file should be written to
+## How It Works
 
+### Auto-Generated Bindings
 
+All functions from the [`process_mining` Rust library](https://docs.rs/process_mining/) are automatically discovered and exposed as Python functions with:
+- **Full type hints** for IDE autocomplete
+- **Automatic documentation** from Rust docs
+- **Type validation** via JSON schemas
 
-### OCEL Import
-The `import_ocel_xml` and `import_ocel_json` functions return a dict of polars DataFrames with the following keys: 'objects', 'events', 'o2o', 'object_changes', 'relations'.
+The bindings are organized by module (mirroring the Rust crate structure):
+```python
+from r4pm import bindings
+
+# Top-level access to all functions
+bindings.discover_dfg(event_log=log_id)
+bindings.num_events(ocel=locel_id)
+
+# Or use submodules for organization
+from r4pm.bindings.discovery.case_centric import dfg
+dfg.discover_dfg(event_log=log_id)
+```
+
+Bindings are automatically generated during the Rust build via `build.rs`.
+
+### Registry System
+
+Data is managed through a registry that holds different object types:
+- `OCEL` - Raw OCEL data
+- `SlimLinkedOCEL` - Memory-efficient linked OCEL (required by most functions)
+- `IndexLinkedOCEL` - Indexed OCEL for analysis
+- `EventLog` - Case-centric event log
+- `EventLogActivityProjection` - Activity-projected log for discovery
 
 ```python
-import rustxes
+# Load files into registry
+ocel_id = r4pm.import_item('OCEL', 'file.xml')
+log_id = r4pm.import_item('EventLog', 'file.xes')
 
-ocel = rustxes.import_ocel_xml("path/to/ocel.xml")
-print(ocel['objects'].shape)
+# Convert between types (either like this or using r4pm.convert_item)
+locel_id = bindings.index_link_ocel(ocel=ocel_id)
+proj_id = bindings.log_to_activity_projection(log=log_id)
+
+# List registry contents
+for item in r4pm.list_items():
+    print(f"{item['id']}: {item['type']}")
 ```
-If you want to use PM4Py's OCEL data structure, you can use the `import_ocel_xml_pm4py` or `import_ocel_json_pm4py` functions, which return a `pm4py.ocel.OCEL` objects.
-Note: PM4Py must be installed for this to work!
 
+
+## Simple Import/Export API
+
+For direct DataFrame operations without the registry, use the `df` submodule.
+
+### XES
+```python
+import r4pm
+
+# Import returns (DataFrame, log_attributes_json)
+xes, attrs = r4pm.df.import_xes("file.xes", date_format="%Y-%m-%d")
+r4pm.df.export_xes(xes, "test_data/output.xes")
+```
+
+### OCEL
+```python
+# Returns dict with DataFrames: events, objects, relations, o2o, object_changes
+ocel = r4pm.df.import_ocel("file.xml")
+print(ocel['events'].shape)
+r4pm.df.export_ocel(ocel, "export.xml")
+
+# PM4Py integration (requires pm4py)
+ocel_pm4py = r4pm.df.import_ocel_pm4py("file.xml")
+print(ocel['events'].shape)
+r4pm.df.export_ocel_pm4py(ocel_pm4py, "export.xml")
+```
 
 ## Development
-This package was scaffolded using [maturin](https://www.maturin.rs/).
-The most important commands are:
-- `maturin build --release` Builds the Rust code and python package (in release mode), producing the build artifacts (wheels)
-- `maturin develop --release` Builds the Rust code and python package (in release mode) and automatically installs/updates it in the corresponding (virtual) python env
 
-  Building this package requires [Rust](https://www.rust-lang.org/), which can be installed using Rustup (see [https://www.rust-lang.org/learn/get-started](https://www.rust-lang.org/learn/get-started)).
-  The Rust part on its own can be build using `cargo build --release`.
+### Setup
+```bash
+# Install Rust: https://rustup.rs/
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install in development mode
+pip install maturin
+maturin develop --release
+```
+
+### How Bindings Are Generated
+
+Python bindings are **automatically generated during the Rust build** via `build.rs`. 
+Thus, bindings are always in sync with the Rust code and do not require manual regeneration.
+
+The build script:
+1. Reads function metadata from the `process_mining` crate
+2. Generates `r4pm/bindings/` with typed Python wrappers and `.pyi` stubs
+3. Organizes functions by their Rust module structure
+
+### Building for Release
+
+```bash
+maturin build --release  # Creates wheels in target/wheels/
+```
+
+The wheel automatically includes the generated bindings.
+
+### Running Tests
+
+```bash
+# Run comprehensive test suite
+python test_all.py
+
+# Run simple example
+python example.py
+```
+
+The test suite (`test_all.py`) covers:
+- Automatic type conversion (positional & keyword arguments)
+- Process discovery (DFG, OC-Declare)
+- Registry operations (CRUD, DataFrames, export)
+- Simple Import/Export DataFrame (`df`) API
+- Edge cases and conversion caching
 
 
 ## LICENSE

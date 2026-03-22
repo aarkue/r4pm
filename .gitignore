@@ -71,5 +71,15 @@ docs/_build/
 # Pyenv
 .python-version
 
+# Auto-generated files (created by build.rs during cargo build)
+r4pm/bindings/
 
+# Rust extension modules and stubs (built by maturin)
+r4pm/*.so
+r4pm/r4pm.pyi
+
+# uv lock file
+uv.lock
+
+# Test data (large files)
 test_data/
