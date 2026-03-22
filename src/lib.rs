@@ -1,12 +1,14 @@
 use std::time::Instant;
 
+use process_mining::EventLog;
 use process_mining::bindings::{
     call, get_fn_binding, list_functions_meta, resolve_argument, AppState, RegistryItem,
     RegistryItemKind,
 };
+use process_mining::core::event_data::case_centric::xes::stream_xes_from_path;
 use process_mining::core::event_data::case_centric::{
     dataframe::{convert_dataframe_to_log, convert_log_to_dataframe},
-    xes::{export_xes_event_log_to_path, import_xes_path, XESImportOptions, XESOuterLogData},
+    xes::{export_xes_event_log_to_path, XESImportOptions},
 };
 use process_mining::core::event_data::object_centric::linked_ocel::LinkedOCELAccess;
 use pyo3::{
@@ -43,25 +45,20 @@ fn import_xes_rs(
     }
     let start_now = Instant::now();
     let mut now = Instant::now();
-    let log = import_xes_path(
+    let (mut stream,outer_data) = stream_xes_from_path(
         &path,
         XESImportOptions {
             date_format,
             ..Default::default()
         },
-    )
-    .unwrap();
+    ).map_err(|e| PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string()))?;
+    let traces = stream.collect();
     if print_debug.is_some_and(|a| a) {
         println!("Importing XES Log took {:.2?}", now.elapsed());
     }
+    let outer_log_data_string = serde_json::to_string(&outer_data) .map_err(|e| PyTypeError::new_err(format!("Failed to convert outer log data to JSON: {e:?}")))?;
+    let log = EventLog::from_traces_and_log_data(traces, outer_data);
     now = Instant::now();
-    let other_data = XESOuterLogData {
-        log_attributes: log.attributes.clone(),
-        extensions: log.extensions.clone().unwrap_or_default().clone(),
-        classifiers: log.classifiers.clone().unwrap_or_default().clone(),
-        global_trace_attrs: log.global_trace_attrs.clone().unwrap_or_default(),
-        global_event_attrs: log.global_event_attrs.clone().unwrap_or_default(),
-    };
     let converted_log = convert_log_to_dataframe(&log, print_debug.unwrap_or_default()).unwrap();
     if print_debug.is_some_and(|a| a) {
         println!("Finished Converting Log; Took {:.2?}", now.elapsed());
@@ -71,7 +68,7 @@ fn import_xes_rs(
     }
     Ok((
         PyDataFrame(converted_log),
-        serde_json::to_string(&other_data).unwrap(),
+        outer_log_data_string,
     ))
 }
 

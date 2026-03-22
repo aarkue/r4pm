@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::DateTime;
 use polars::{prelude::*, series::Series};
 use process_mining::{
     OCEL,
@@ -43,30 +42,32 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
             "Warning: Global object attributes is not a superset of actual object attributes"
         );
     }
-    let object_attributes_initial: HashSet<String> = object_attributes
-        .clone()
-        .into_iter()
-        .filter(|a| {
-            ocel.objects.iter().any(|o| {
-                o.attributes
-                    .iter()
-                    .any(|oa| &oa.name == a && oa.time == DateTime::UNIX_EPOCH)
-            })
-        })
-        .collect();
+    // PM4Py uses the first attributes value (index 0) in the objects DF (i.e., each object attribute is always a column in objects)
+    // We match this behavior.
+    let object_attributes_initial: &HashSet<String> = &object_attributes;
+        // .clone()
+        // .into_iter()
+        // .filter(|a| {
+        //     ocel.objects.iter().any(|o| {
+        //         o.attributes
+        //             .iter()
+        //             .any(|oa| &oa.name == a && oa.time == DateTime::UNIX_EPOCH)
+        //     })
+        // })
+        // .collect();
     let objects_df = DataFrame::from_iter(
         object_attributes_initial
             .into_iter()
             .map(|name| {
                 Series::from_any_values(
-                    (&name).into(),
+                    (name).into(),
                     ocel.objects
                         .iter()
                         .map(|o| {
                             let attr = o
                                 .attributes
                                 .iter()
-                                .find(|a| a.name == name && a.time == DateTime::UNIX_EPOCH);
+                                .find(|a| &a.name == name);
                             let val = match attr {
                                 Some(v) => &v.value,
                                 None => &OCELAttributeValue::Null,
