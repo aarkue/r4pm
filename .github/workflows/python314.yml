@@ -52,6 +52,8 @@ jobs:
         uses: PyO3/maturin-action@v1
         env:
           GH_TOKEN: ${{ github.token }}
+          DUCKDB_VERSION: v1.5.1
+          KUZU_VERSION: v0.11.2
           DUCKDB_ASSET: ${{ matrix.platform.duckdb }}
           KUZU_ASSET: ${{ matrix.platform.kuzu }}
           DUCKDB_LIB_DIR: /io/native/duckdb
