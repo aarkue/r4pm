@@ -11,12 +11,16 @@ on:
     #   - main
     #   - master
     tags:
-      - '*'
+      - 'experimental-ocpq-v*'
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  DUCKDB_VERSION: v1.3.2
+  KUZU_VERSION: v0.11.2
 
 jobs:
   linux:
@@ -26,8 +30,11 @@ jobs:
         platform:
           - runner: ubuntu-22.04
             target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
+            duckdb: libduckdb-linux-amd64.zip
+            kuzu: libkuzu-linux-x86_64.tar.gz
+          # 32-bit Linux does not have matching DuckDB/Kuzu release artifacts.
+          # - runner: ubuntu-22.04
+          #   target: x86
           # - runner: ubuntu-22.04
           #   target: aarch64
           # - runner: ubuntu-22.04
@@ -41,8 +48,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.14
+      - name: Install native libraries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUCKDB_ASSET: ${{ matrix.platform.duckdb }}
+          KUZU_ASSET: ${{ matrix.platform.kuzu }}
+        run: python .github/scripts/setup-native-libs.py
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          DUCKDB_LIB_DIR: /io/native/duckdb
+          DUCKDB_INCLUDE_DIR: /io/native/duckdb
+          LD_LIBRARY_PATH: /io/native/kuzu:/io/native/duckdb
+          KUZU_SHARED: 1
+          KUZU_LIBRARY_DIR: /io/native/kuzu
+          KUZU_INCLUDE_DIR: /io/native/kuzu
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14
@@ -50,6 +70,13 @@ jobs:
           manylinux: auto
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
+        env:
+          DUCKDB_LIB_DIR: /io/native/duckdb
+          DUCKDB_INCLUDE_DIR: /io/native/duckdb
+          LD_LIBRARY_PATH: /io/native/kuzu:/io/native/duckdb
+          KUZU_SHARED: 1
+          KUZU_LIBRARY_DIR: /io/native/kuzu
+          KUZU_INCLUDE_DIR: /io/native/kuzu
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14t
@@ -67,14 +94,23 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-latest
-            target: x86
+            duckdb: libduckdb-windows-amd64.zip
+            kuzu: libkuzu*windows*64*.zip
+          # 32-bit Windows does not have matching DuckDB/Kuzu release artifacts.
+          # - runner: windows-latest
+          #   target: x86
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: 3.14
           architecture: ${{ matrix.platform.target }}
+      - name: Install native libraries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUCKDB_ASSET: ${{ matrix.platform.duckdb }}
+          KUZU_ASSET: ${{ matrix.platform.kuzu }}
+        run: python .github/scripts/setup-native-libs.py
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -100,13 +136,23 @@ jobs:
         platform:
           - runner: macos-15-intel
             target: x86_64
+            duckdb: libduckdb-osx-universal.zip
+            kuzu: libkuzu*x86_64*.tar.gz
           - runner: macos-latest
             target: aarch64
+            duckdb: libduckdb-osx-universal.zip
+            kuzu: libkuzu*arm64*.tar.gz
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: 3.14
+      - name: Install native libraries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DUCKDB_ASSET: ${{ matrix.platform.duckdb }}
+          KUZU_ASSET: ${{ matrix.platform.kuzu }}
+        run: python .github/scripts/setup-native-libs.py
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -143,7 +189,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') || github.event_name == 'workflow_dispatch' }}
     needs: [linux, windows, macos, sdist] # musllinux
     permissions:
       # Use to sign the release artifacts
@@ -158,8 +204,18 @@ jobs:
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: 'wheels-*/*'
+      - name: Publish GitHub pre-release
+        if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" wheels-*/*
+          --title "r4pm experimental OCPQ alpha $GITHUB_REF_NAME"
+          --notes "Experimental OCPQ alpha build for testing. Install with: python -m pip install r4pm==0.5.5a1"
+          --prerelease
+          --latest=false
       - name: Publish to PyPI
-        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') }}
         uses: PyO3/maturin-action@v1
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

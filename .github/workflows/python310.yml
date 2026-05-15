@@ -6,13 +6,6 @@
 name: Python3.10
 
 on:
-  push:
-    # branches:
-    #   - main
-    #   - master
-    tags:
-      - '*'
-  pull_request:
   workflow_dispatch:
 
 permissions:

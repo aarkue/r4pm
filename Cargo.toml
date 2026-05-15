@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.5.4"
+version = "0.5.5-alpha.1"
 edition = "2021"
 build = "build.rs"
 
@@ -10,8 +10,9 @@ name = "r4pm"
 crate-type = ["cdylib"]
 
 [dependencies]
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.4"}
-# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], path = "../rust4pm/process_mining"}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.4"}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], path = "../branch-copies/rust4pm-main/process_mining"}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], git = "https://github.com/aarkue/rust4pm.git", branch = "feat/ocel-import-export-traits-improved-memory" }
 pyo3 = {version = "0.25", features = [ "extension-module"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
@@ -21,8 +22,18 @@ uuid = {version = "1.4.1", features = ["v4", "serde"]}
 serde_json = "1.0.105"
 serde = {version = "1.0.188", features = ["derive"]}
 inventory = "0.3"
+# ocpq-shared = {path = "../OCPQ/backend/shared/"}
+ocpq-shared = {git = "https://github.com/aarkue/OCPQ.git", branch = "feat/ocel-import-export-traits-improved-memory" }
 
 [build-dependencies]
 serde_json = "1.0"
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.2"}
-# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], path = "../rust4pm/process_mining"}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.2"}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], path = "../branch-copies/rust4pm-main/process_mining"}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], git = "https://github.com/aarkue/rust4pm.git", branch = "feat/ocel-import-export-traits-improved-memory" }
+kuzu = "=0.11.2"
+# kuzu 0.11.2 pins cxx = "=1.0.138" but leaves cxx-build unpinned; newer cxx-build emits
+# versioned cxxbridge symbols that don't match, so pin cxx-build to match cxx.
+cxx-build = "=1.0.138"
+
+[patch.crates-io]
+sqlx = { git =  "https://github.com/aarkue/sqlx-fix.git", branch = "sqlite3-fix"}

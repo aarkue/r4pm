@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use process_mining::EventLog;
+use ocpq_shared::binding_box::{Binding, BindingBoxTree};
 use process_mining::bindings::{
     call, get_fn_binding, list_functions_meta, resolve_argument, AppState, RegistryItem,
     RegistryItemKind,
@@ -11,17 +11,22 @@ use process_mining::core::event_data::case_centric::{
     xes::{export_xes_event_log_to_path, XESImportOptions},
 };
 use process_mining::core::event_data::object_centric::linked_ocel::LinkedOCELAccess;
+use process_mining::EventLog;
 use pyo3::{
-    exceptions::PyTypeError,
+    exceptions::{PyTypeError, PyValueError},
     prelude::*,
-    types::{PyDict, PyList},
+    types::{PyDict, PyList, PyTuple},
+    IntoPyObjectExt,
 };
 use pyo3_polars::PyDataFrame;
 use serde_json::Value as JsonValue;
 
 use crate::ocel::{
-    OCEL2DataFrames, OCEL2DataFramesRef, export_ocel_rs, import_ocel_json_rs, import_ocel_rs, import_ocel_xml_rs
+    export_ocel_rs, import_ocel_json_rs, import_ocel_rs, import_ocel_xml_rs, OCEL2DataFrames,
+    OCEL2DataFramesRef,
 };
+
+ocpq_shared::use_mimalloc!();
 
 mod ocel;
 ///
@@ -45,18 +50,21 @@ fn import_xes_rs(
     }
     let start_now = Instant::now();
     let mut now = Instant::now();
-    let (mut stream,outer_data) = stream_xes_from_path(
+    let (mut stream, outer_data) = stream_xes_from_path(
         &path,
         XESImportOptions {
             date_format,
             ..Default::default()
         },
-    ).map_err(|e| PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string()))?;
+    )
+    .map_err(|e| PyErr::new::<pyo3::exceptions::PyException, _>(e.to_string()))?;
     let traces = stream.collect();
     if print_debug.is_some_and(|a| a) {
         println!("Importing XES Log took {:.2?}", now.elapsed());
     }
-    let outer_log_data_string = serde_json::to_string(&outer_data) .map_err(|e| PyTypeError::new_err(format!("Failed to convert outer log data to JSON: {e:?}")))?;
+    let outer_log_data_string = serde_json::to_string(&outer_data).map_err(|e| {
+        PyTypeError::new_err(format!("Failed to convert outer log data to JSON: {e:?}"))
+    })?;
     let log = EventLog::from_traces_and_log_data(traces, outer_data);
     now = Instant::now();
     let converted_log = convert_log_to_dataframe(&log, print_debug.unwrap_or_default()).unwrap();
@@ -66,10 +74,7 @@ fn import_xes_rs(
     if print_debug.is_some_and(|a| a) {
         println!("Total duration: {:.2?}", start_now.elapsed());
     }
-    Ok((
-        PyDataFrame(converted_log),
-        outer_log_data_string,
-    ))
+    Ok((PyDataFrame(converted_log), outer_log_data_string))
 }
 
 #[pyfunction]
@@ -111,6 +116,8 @@ fn r4pm(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(remove_item, m)?)?;
     // import_item_from_df
     m.add_function(wrap_pyfunction!(import_item_from_df, m)?)?;
+
+    m.add_function(wrap_pyfunction!(evaluate_ocpq, m)?)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
     Ok(())
@@ -344,19 +351,19 @@ fn item_to_df(item_id: String, py: Python<'_>) -> PyResult<PyObject> {
             let ocel_dfs = crate::ocel::ocel2_to_df(ocel);
             let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
             Ok(result_map.into_pyobject(py)?.into_any().unbind())
-        },
+        }
         RegistryItem::IndexLinkedOCEL(locel) => {
             // TODO: Optimize ocel2_to_df to only take LinkedOCELAccess
             let ocel_dfs = crate::ocel::ocel2_to_df(&locel.construct_ocel());
             let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
             Ok(result_map.into_pyobject(py)?.into_any().unbind())
-        },
+        }
         RegistryItem::SlimLinkedOCEL(locel) => {
             // TODO: Optimize ocel2_to_df to only take LinkedOCELAccess
             let ocel_dfs = crate::ocel::ocel2_to_df(&locel.construct_ocel());
             let result_map = crate::ocel::ocel_dfs_to_py(ocel_dfs);
             Ok(result_map.into_pyobject(py)?.into_any().unbind())
-        },
+        }
         _ => Err(PyTypeError::new_err(
             "This item type cannot be converted to DataFrame",
         )),
@@ -481,6 +488,104 @@ fn import_item_from_df(
 
     state.items.write().unwrap().insert(id.clone(), item);
     Ok(id)
+}
+
+#[pyfunction]
+fn evaluate_ocpq(tree: String, item_id: String, py: Python<'_>) -> PyResult<Vec<PyObject>> {
+    let state = get_or_create_app_state(py)?;
+    let items = state.items.read().unwrap();
+    let item = items
+        .get(&item_id)
+        .ok_or_else(|| PyTypeError::new_err(format!("Item not found: {}", item_id)))?;
+
+    let ocel = match item {
+        RegistryItem::SlimLinkedOCEL(o) => o,
+        _ => {
+            return Err(PyTypeError::new_err(format!(
+                "Item with ID '{}' is not a SlimLinkedOCEL",
+                item_id
+            )));
+        }
+    };
+
+    let parsed_tree: BindingBoxTree = serde_json::from_str(&tree)
+        .map_err(|e| PyValueError::new_err(format!("Failed to parse tree JSON: {}", e)))?;
+
+    if parsed_tree.nodes.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let step_cache = parsed_tree.compute_step_cache(ocel);
+
+
+    // Streaming sink: builds the result `PyTuple`s inline as bindings are
+    // emitted by the evaluator, avoiding the intermediate
+    // `Vec<(Arc<Binding>, Option<ViolationReason>)>` materialization.
+    let mut rows: Vec<PyObject> = Vec::new();
+    let mut emit_err: Option<PyErr> = None;
+    let emit_result = parsed_tree.nodes[0].evaluate_no_descendants(
+        0,
+        Binding::default(),
+        &parsed_tree,
+        ocel,
+        &step_cache,
+        &mut |binding, violation| {
+            let mut build = || -> PyResult<()> {
+                let mut cells: Vec<PyObject> = Vec::with_capacity(
+                    binding.event_map.len()
+                        + binding.object_map.len()
+                        + binding.label_map.len()
+                        + 1,
+                );
+
+                for (_, idx) in &binding.object_map {
+                    // Pass directly to Python.
+                    cells.push(ocel.get_ob_id(*idx).into_py_any(py)?);
+                }
+
+                for (_, idx) in &binding.event_map {
+                    cells.push(ocel.get_ev_id(*idx).into_py_any(py)?);
+                }
+
+                for (_, val) in &binding.label_map {
+                    cells.push(label_value_to_py(val, py)?);
+                }
+
+                cells.push(violation.is_none().into_py_any(py)?);
+
+                rows.push(PyTuple::new(py, cells)?.into_any().unbind());
+                Ok(())
+            };
+            match build() {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    let msg = e.to_string();
+                    emit_err = Some(e);
+                    Err(msg)
+                }
+            }
+        },
+    );
+    if let Some(e) = emit_err {
+        return Err(e);
+    }
+    emit_result.map_err(|e| PyTypeError::new_err(format!("Failed to evaluate OCPQ: {}", e)))?;
+
+    Ok(rows)
+}
+
+fn label_value_to_py(
+    v: &ocpq_shared::binding_box::LabelValue,
+    py: Python<'_>,
+) -> PyResult<PyObject> {
+    use ocpq_shared::binding_box::LabelValue;
+    match v {
+        LabelValue::String(s) => s.as_str().into_py_any(py),
+        LabelValue::Int(i) => i.into_py_any(py),
+        LabelValue::Float(f) => f.0.into_py_any(py),
+        LabelValue::Bool(b) => b.into_py_any(py),
+        LabelValue::Null => Ok(py.None()),
+    }
 }
 
 // Thread-safe AppState management
