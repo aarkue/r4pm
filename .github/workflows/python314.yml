@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 env:
-  DUCKDB_VERSION: v1.3.2
+  DUCKDB_VERSION: v1.5.1
   KUZU_VERSION: v0.11.2
 
 jobs:
@@ -69,21 +69,6 @@ jobs:
           sccache: 'true'
           manylinux: 2_28
           before-script-linux: dnf install -y openssl-devel pkgconf-pkg-config
-      - name: Build free-threaded wheels
-        uses: PyO3/maturin-action@v1
-        env:
-          DUCKDB_LIB_DIR: /io/native/duckdb
-          DUCKDB_INCLUDE_DIR: /io/native/duckdb
-          LD_LIBRARY_PATH: /io/native/kuzu:/io/native/duckdb
-          KUZU_SHARED: 1
-          KUZU_LIBRARY_DIR: /io/native/kuzu
-          KUZU_INCLUDE_DIR: /io/native/kuzu
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
-          sccache: 'true'
-          manylinux: 2_28
-          before-script-linux: dnf install -y openssl-devel pkgconf-pkg-config
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -119,12 +104,6 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14
           sccache: 'true'
-      # - name: Build free-threaded wheels
-      #   uses: PyO3/maturin-action@v1
-      #   with:
-      #     target: ${{ matrix.platform.target }}
-      #     args: --release --out dist -i python3.14t
-      #     sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -160,12 +139,6 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14
-          sccache: 'true'
-      - name: Build free-threaded wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14t
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
