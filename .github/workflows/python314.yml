@@ -7,9 +7,6 @@ name: Python3.14
 
 on:
   push:
-    # branches:
-    #   - main
-    #   - master
     tags:
       - 'experimental-ocpq-v*'
   pull_request:
@@ -18,31 +15,19 @@ on:
 permissions:
   contents: read
 
-env:
-  DUCKDB_VERSION: v1.5.1
-  KUZU_VERSION: v0.11.2
-
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 90
     strategy:
       matrix:
         platform:
           - runner: ubuntu-22.04
             target: x86_64
-            duckdb: libduckdb-linux-amd64.zip
-            kuzu: libkuzu-linux-x86_64.tar.gz
-          # 32-bit Linux does not have matching DuckDB/Kuzu release artifacts.
-          # - runner: ubuntu-22.04
-          #   target: x86
-          # - runner: ubuntu-22.04
-          #   target: aarch64
-          # - runner: ubuntu-22.04
-          #   target: armv7
-          # - runner: ubuntu-22.04
-          #   target: s390x
-          # - runner: ubuntu-22.04
-          #   target: ppc64le
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CMAKE_BUILD_PARALLEL_LEVEL: "2"
+      NUM_JOBS: "2"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -57,92 +42,58 @@ jobs:
           manylinux: 2_28
           before-script-linux: |
             dnf install -y openssl-devel pkgconf-pkg-config
-            python3 .github/scripts/setup-native-libs.py --root /io/native --duckdb-version v1.5.1 --duckdb-asset libduckdb-linux-amd64.zip --kuzu-version v0.11.2 --kuzu-asset libkuzu-linux-x86_64.tar.gz
-            export DUCKDB_LIB_DIR=/io/native/duckdb
-            export DUCKDB_INCLUDE_DIR=/io/native/duckdb
-            export KUZU_SHARED=1
-            export KUZU_LIBRARY_DIR=/io/native/kuzu
-            export KUZU_INCLUDE_DIR=/io/native/kuzu
-            export LD_LIBRARY_PATH=/io/native/kuzu:/io/native/duckdb:${LD_LIBRARY_PATH:-}
-            ls -la /io/native/duckdb /io/native/kuzu
-            test -e /io/native/duckdb/libduckdb.so
+      - name: Smoke test wheel
+        run: |
+          python -m venv /tmp/v
+          . /tmp/v/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install --no-index --find-links dist r4pm
+          python -c "import r4pm; from r4pm.bindings.core.event_data.object_centric.graph_db import ocel_kuzudb; from r4pm.bindings.core.event_data.object_centric.ocel_sql.duckdb import duckdb_ocel_export; print('smoke ok')"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
+
   windows:
     runs-on: ${{ matrix.platform.runner }}
+    timeout-minutes: 90
     strategy:
       matrix:
         platform:
           - runner: windows-latest
             target: x64
-            duckdb: libduckdb-windows-amd64.zip
-            kuzu: libkuzu-windows-x86_64.zip
-          # 32-bit Windows does not have matching DuckDB/Kuzu release artifacts.
-          # - runner: windows-latest
-          #   target: x86
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CMAKE_BUILD_PARALLEL_LEVEL: "2"
+      NUM_JOBS: "2"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: 3.14
           architecture: ${{ matrix.platform.target }}
-      - name: Install native libraries
-        run: >
-          python .github/scripts/setup-native-libs.py
-          --duckdb-version "${{ env.DUCKDB_VERSION }}"
-          --duckdb-asset "${{ matrix.platform.duckdb }}"
-          --kuzu-version "${{ env.KUZU_VERSION }}"
-          --kuzu-asset "${{ matrix.platform.kuzu }}"
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Ninja
+        run: pip install ninja
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14
           sccache: 'true'
+      - name: Smoke test wheel
+        shell: bash
+        run: |
+          python -m venv /tmp/v
+          . /tmp/v/Scripts/activate
+          python -m pip install --upgrade pip
+          python -m pip install --no-index --find-links dist r4pm
+          python -c "import r4pm; from r4pm.bindings.core.event_data.object_centric.graph_db import ocel_kuzudb; from r4pm.bindings.core.event_data.object_centric.ocel_sql.duckdb import duckdb_ocel_export; print('smoke ok')"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
-
-  macos:
-    runs-on: ${{ matrix.platform.runner }}
-    strategy:
-      matrix:
-        platform:
-          - runner: macos-15-intel
-            target: x86_64
-            duckdb: libduckdb-osx-universal.zip
-            kuzu: libkuzu-osx-universal.tar.gz
-          - runner: macos-latest
-            target: aarch64
-            duckdb: libduckdb-osx-universal.zip
-            kuzu: libkuzu-osx-universal.tar.gz
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.14
-      - name: Install native libraries
-        run: >
-          python .github/scripts/setup-native-libs.py
-          --duckdb-version "${{ env.DUCKDB_VERSION }}"
-          --duckdb-asset "${{ matrix.platform.duckdb }}"
-          --kuzu-version "${{ env.KUZU_VERSION }}"
-          --kuzu-asset "${{ matrix.platform.kuzu }}"
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14
-          sccache: 'true'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-macos-${{ matrix.platform.target }}
           path: dist
 
   sdist:
@@ -164,13 +115,10 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, windows, macos, sdist] # musllinux
+    needs: [linux, windows, sdist]
     permissions:
-      # Use to sign the release artifacts
       id-token: write
-      # Used to upload release artifacts
       contents: write
-      # Used to generate artifact attestation
       attestations: write
     steps:
       - uses: actions/download-artifact@v4
@@ -182,13 +130,14 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >
-          gh release create "$GITHUB_REF_NAME" wheels-*/*
-          --repo "${{ github.repository }}"
-          --title "r4pm experimental OCPQ alpha $GITHUB_REF_NAME"
-          --notes "Experimental OCPQ alpha build for testing. Install with: python -m pip install r4pm==0.5.5a1"
-          --prerelease
-          --latest=false
+        run: |
+          VERSION="${GITHUB_REF_NAME#experimental-ocpq-v}"
+          gh release create "$GITHUB_REF_NAME" wheels-*/* \
+            --repo "${{ github.repository }}" \
+            --title "r4pm experimental OCPQ alpha $GITHUB_REF_NAME" \
+            --notes "Experimental OCPQ alpha build for testing. Install with: python -m pip install r4pm==${VERSION}" \
+            --prerelease \
+            --latest=false
       - name: Publish to PyPI
         if: ${{ startsWith(github.ref, 'refs/tags/experimental-ocpq-v') }}
         uses: PyO3/maturin-action@v1
