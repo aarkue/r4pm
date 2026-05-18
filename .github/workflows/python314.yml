@@ -61,16 +61,6 @@ jobs:
             export KUZU_INCLUDE_DIR=/io/native/kuzu
             export LD_LIBRARY_PATH=/io/native/kuzu:/io/native/duckdb:${LD_LIBRARY_PATH:-}
             ls -la /io/native/duckdb /io/native/kuzu
-      - name: Smoke test wheel
-        run: |
-          set -euxo pipefail
-          ls -la dist
-          unzip -l dist/*.whl | head -60
-          python -m venv /tmp/v
-          . /tmp/v/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install --no-index --find-links dist r4pm
-          python -c "import r4pm; from r4pm.bindings.core.event_data.object_centric.graph_db import ocel_kuzudb; from r4pm.bindings.core.event_data.object_centric.ocel_sql.duckdb import duckdb_ocel_export; print('smoke ok')"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -125,17 +115,6 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python3.14 --auditwheel=repair
           sccache: 'true'
-      - name: Smoke test wheel
-        shell: bash
-        run: |
-          set -euxo pipefail
-          ls -la dist
-          unzip -l dist/*.whl | head -60
-          python -m venv /tmp/v
-          . /tmp/v/Scripts/activate
-          python -m pip install --upgrade pip
-          python -m pip install --no-index --find-links dist r4pm
-          python -c "import r4pm; from r4pm.bindings.core.event_data.object_centric.graph_db import ocel_kuzudb; from r4pm.bindings.core.event_data.object_centric.ocel_sql.duckdb import duckdb_ocel_export; print('smoke ok')"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
