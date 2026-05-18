@@ -13,9 +13,6 @@ crate-type = ["cdylib"]
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.4"}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], path = "../branch-copies/rust4pm-main/process_mining"}
 process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], git = "https://github.com/aarkue/rust4pm.git", branch = "feat/ocel-import-export-traits-improved-memory" }
-# Direct duckdb dep with bundled enables static-from-source build of libduckdb;
-# Cargo feature unification propagates this to process_mining's transitive duckdb dep.
-duckdb = { version = "=1.2.1", features = ["bundled", "chrono"] }
 pyo3 = {version = "0.25", features = [ "extension-module"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}

@@ -9,25 +9,30 @@ on:
   push:
     tags:
       - 'experimental-ocpq-v*'
+    branches:
+      - 'feat/r4pm-updates-and-ocpq-support'
   pull_request:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  DUCKDB_VERSION: v1.5.1
+  KUZU_VERSION: v0.11.2
+  MATURIN_VERSION: v1.13.3
+
 jobs:
   linux:
     runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       matrix:
         platform:
           - runner: ubuntu-22.04
             target: x86_64
-    env:
-      CARGO_BUILD_JOBS: "2"
-      CMAKE_BUILD_PARALLEL_LEVEL: "2"
-      NUM_JOBS: "2"
+            duckdb_asset: libduckdb-linux-amd64.zip
+            kuzu_asset: libkuzu-linux-x86_64.tar.gz
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,14 +41,31 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14
+          args: --release --out dist -i python3.14 --auditwheel=repair
           sccache: 'true'
           manylinux: 2_28
           before-script-linux: |
-            dnf install -y openssl-devel pkgconf-pkg-config
+            set -euxo pipefail
+            dnf install -y openssl-devel pkgconf-pkg-config unzip
+            mkdir -p /io/native/duckdb /io/native/kuzu
+            curl -fL -o /tmp/duckdb.zip "https://github.com/duckdb/duckdb/releases/download/${{ env.DUCKDB_VERSION }}/${{ matrix.platform.duckdb_asset }}"
+            unzip -o /tmp/duckdb.zip -d /io/native/duckdb
+            curl -fL -o /tmp/kuzu.tar.gz "https://github.com/kuzudb/kuzu/releases/download/${{ env.KUZU_VERSION }}/${{ matrix.platform.kuzu_asset }}"
+            tar xzf /tmp/kuzu.tar.gz -C /io/native/kuzu
+            export DUCKDB_LIB_DIR=/io/native/duckdb
+            export DUCKDB_INCLUDE_DIR=/io/native/duckdb
+            export KUZU_SHARED=1
+            export KUZU_LIBRARY_DIR=/io/native/kuzu
+            export KUZU_INCLUDE_DIR=/io/native/kuzu
+            export LD_LIBRARY_PATH=/io/native/kuzu:/io/native/duckdb:${LD_LIBRARY_PATH:-}
+            ls -la /io/native/duckdb /io/native/kuzu
       - name: Smoke test wheel
         run: |
+          set -euxo pipefail
+          ls -la dist
+          unzip -l dist/*.whl | head -60
           python -m venv /tmp/v
           . /tmp/v/bin/activate
           python -m pip install --upgrade pip
@@ -57,34 +79,58 @@ jobs:
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       matrix:
         platform:
           - runner: windows-latest
             target: x64
-    env:
-      CARGO_BUILD_JOBS: "2"
-      CMAKE_BUILD_PARALLEL_LEVEL: "2"
-      NUM_JOBS: "2"
+            duckdb_asset: libduckdb-windows-amd64.zip
+            kuzu_asset: libkuzu-windows-x86_64.zip
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: 3.14
           architecture: ${{ matrix.platform.target }}
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Install Ninja
-        run: pip install ninja
+      - name: Download native libraries
+        shell: bash
+        run: |
+          set -euxo pipefail
+          NATIVE_DIR="$GITHUB_WORKSPACE/native"
+          mkdir -p "$NATIVE_DIR/duckdb" "$NATIVE_DIR/kuzu"
+          curl -fL -o /tmp/duckdb.zip "https://github.com/duckdb/duckdb/releases/download/${{ env.DUCKDB_VERSION }}/${{ matrix.platform.duckdb_asset }}"
+          unzip -o /tmp/duckdb.zip -d "$NATIVE_DIR/duckdb"
+          curl -fL -o /tmp/kuzu.zip "https://github.com/kuzudb/kuzu/releases/download/${{ env.KUZU_VERSION }}/${{ matrix.platform.kuzu_asset }}"
+          unzip -o /tmp/kuzu.zip -d "$NATIVE_DIR/kuzu"
+          DUCKDB_WIN=$(cygpath -w "$NATIVE_DIR/duckdb")
+          KUZU_WIN=$(cygpath -w "$NATIVE_DIR/kuzu")
+          {
+            echo "DUCKDB_LIB_DIR=${DUCKDB_WIN}"
+            echo "DUCKDB_INCLUDE_DIR=${DUCKDB_WIN}"
+            echo "KUZU_SHARED=1"
+            echo "KUZU_LIBRARY_DIR=${KUZU_WIN}"
+            echo "KUZU_INCLUDE_DIR=${KUZU_WIN}"
+          } >> "$GITHUB_ENV"
+          # Put DLL dirs on PATH so maturin's wheel repair can locate them
+          {
+            echo "${DUCKDB_WIN}"
+            echo "${KUZU_WIN}"
+          } >> "$GITHUB_PATH"
+          ls -la "$NATIVE_DIR/duckdb" "$NATIVE_DIR/kuzu"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
-          args: --release --out dist -i python3.14
+          args: --release --out dist -i python3.14 --auditwheel=repair
           sccache: 'true'
       - name: Smoke test wheel
         shell: bash
         run: |
+          set -euxo pipefail
+          ls -la dist
+          unzip -l dist/*.whl | head -60
           python -m venv /tmp/v
           . /tmp/v/Scripts/activate
           python -m pip install --upgrade pip
@@ -103,6 +149,7 @@ jobs:
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
           command: sdist
           args: --out dist
       - name: Upload sdist
@@ -144,5 +191,6 @@ jobs:
         env:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
           command: upload
           args: --non-interactive --skip-existing wheels-*/*
