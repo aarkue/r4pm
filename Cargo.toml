@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.5.5-alpha.2"
+version = "0.5.5-alpha.3"
 edition = "2021"
 build = "build.rs"
 
@@ -13,9 +13,6 @@ crate-type = ["cdylib"]
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], version = "0.5.4"}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], path = "../branch-copies/rust4pm-main/process_mining"}
 process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb", "kuzudb"], git = "https://github.com/aarkue/rust4pm.git", branch = "feat/ocel-import-export-traits-improved-memory" }
-# Pin duckdb to 1.2.1 (last version known to compile against process_mining 0.5.6).
-# Newer duckdb crate jumped to 1.10501.0 style and may break API compat.
-duckdb = { version = "=1.2.1", features = ["chrono"] }
 pyo3 = {version = "0.25", features = [ "extension-module"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
