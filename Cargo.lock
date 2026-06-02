@@ -2860,7 +2860,7 @@ dependencies = [
 [[package]]
 name = "ocpq-shared"
 version = "0.1.0"
-source = "git+https://github.com/aarkue/OCPQ.git?branch=feat%2Focel-import-export-traits-improved-memory#08fc4894fbc4679f4c77e2c43f6fc22822874aed"
+source = "git+https://github.com/aarkue/OCPQ.git?branch=feat%2Focel-import-export-traits-improved-memory#eacb3e6258aa6d980ceb2f7e442ad4eb2f4204ea"
 dependencies = [
  "anyhow",
  "cel-interpreter",
@@ -4064,7 +4064,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "r4pm"
-version = "0.5.5-alpha.3"
+version = "0.5.5-alpha.4"
 dependencies = [
  "chrono",
  "cxx-build",
