@@ -582,10 +582,11 @@ fn generate_function_wrapper_with_types(
 {docstring}
     """
     import json
+    import orjson
     from {import_prefix}r4pm import call_binding
 {dict_lines}
     result = call_binding("{func_id}", json.dumps(args_dict))
-    return json.loads(result)"#,
+    return orjson.loads(result)"#,
         py_name = py_name,
         params = params.join(", "),
         return_type = return_type,

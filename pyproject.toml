@@ -18,6 +18,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dynamic = ["version"]
+dependencies = [
+  "orjson",
+]
 [project.optional-dependencies]
 polars = [
   'polars[pandas, pyarrow]',

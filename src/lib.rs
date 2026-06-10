@@ -15,7 +15,7 @@ use process_mining::EventLog;
 use pyo3::{
     exceptions::{PyTypeError, PyValueError},
     prelude::*,
-    types::{PyDict, PyList, PyTuple},
+    types::{PyBytes, PyDict, PyList, PyTuple},
     IntoPyObjectExt,
 };
 use pyo3_polars::PyDataFrame;
@@ -172,9 +172,13 @@ fn list_bindings() -> PyResult<Vec<PyObject>> {
 /// * `args_json` - JSON string containing the function arguments
 ///
 /// # Returns
-/// JSON string containing the result (either a value or a registry item ID)
+/// JSON bytes containing the result (either a value or a registry item ID)
 #[pyfunction]
-fn call_binding(function_id: String, args_json: String, py: Python<'_>) -> PyResult<String> {
+fn call_binding<'py>(
+    function_id: String,
+    args_json: String,
+    py: Python<'py>,
+) -> PyResult<Bound<'py, PyBytes>> {
     // Get the global app state
     let state = get_or_create_app_state(py)?;
 
@@ -207,13 +211,12 @@ fn call_binding(function_id: String, args_json: String, py: Python<'_>) -> PyRes
         }
     }
 
-    // Call the function
+    // Call the function. The handler already returns the result as JSON bytes,
+    // so we hand them to Python directly (no re-serialization).
     let result = call(binding, &args, &state)
         .map_err(|e| PyTypeError::new_err(format!("Function call failed: {}", e)))?;
 
-    // Return result as JSON
-    serde_json::to_string(&result)
-        .map_err(|e| PyTypeError::new_err(format!("Failed to serialize result: {}", e)))
+    Ok(PyBytes::new(py, &result))
 }
 
 /// Load a registry item from a file path

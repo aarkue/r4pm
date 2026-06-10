@@ -98,7 +98,7 @@ def list_bindings() -> List[Dict[str, Any]]:
     """
     ...
 
-def call_binding(function_id: str, args_json: str) -> str:
+def call_binding(function_id: str, args_json: str) -> bytes:
     """
     Call a binding function by ID.
     
