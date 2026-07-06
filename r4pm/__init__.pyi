@@ -2,6 +2,7 @@
 
 """
 from typing import Any, Dict, List, Optional, Union
+import polars as pl
 # ============================================================================
 # Registry Functions
 # ============================================================================
@@ -120,6 +121,8 @@ from . import bindings as bindings
 
 
 from . import df as df
+
+from . import petri_net as petri_net
 
 __all__: List[str]
 __version__: str

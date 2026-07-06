@@ -46,3 +46,43 @@ print("\n🧹 Cleaning up registry...")
 for item in items:
     r4pm.remove_item(item['id'])
 print("✅ Done!")
+
+
+# ---------------------------------------------------------------------------
+# Petri net discovery (PM4Py) + alignment-based fitness (Rust)
+# ---------------------------------------------------------------------------
+print("\n" + "=" * 60)
+print("Petri net alignment demo (PM4Py discovery + Rust alignment)")
+print("=" * 60)
+
+import pm4py
+from r4pm import petri_net
+from r4pm.bindings.conformance.case_centric.alignments import (
+    align_variants,
+    compute_fitness,
+)
+
+LOG = "test_data/Sepsis Cases - Event Log.xes.gz"
+
+# 1. Discover a Petri net with PM4Py (Inductive Miner infrequent, 0.2 noise threshold)
+print("\n🔍 Discovering Petri net with IMf (noise_threshold=0.2)...")
+log = pm4py.read_xes(LOG)
+net, im, fm = pm4py.discover_petri_net_inductive(log, noise_threshold=0.2)
+print(f"✓ Discovered net: {len(net.places)} places, {len(net.transitions)} transitions")
+
+# 2. Convert the PM4Py net to an r4pm Petri net dict
+rnet = petri_net.from_pm4py(net, im, fm)
+
+# 3. Load the log into the registry
+log_id = r4pm.import_item("EventLog", LOG)
+
+# 4. Align all variants with the Rust binding and compute fitness
+#    (the EventLog id is auto-projected to activity variants)
+print("🧮 Aligning all variants with the Rust binding...")
+align_res = align_variants(rnet, log_id)
+fitness = compute_fitness(align_res, rnet)
+print(f"✓ Aligned {len(align_res)} variants")
+for key, value in fitness.items():
+    print(f"✅ {key}: {value}")
+
+r4pm.remove_item(log_id)

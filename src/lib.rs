@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use process_mining::EventLog;
+use process_mining::PetriNet;
 use process_mining::bindings::{
     call, get_fn_binding, list_functions_meta, resolve_argument, AppState, RegistryItem,
     RegistryItemKind,
@@ -82,6 +83,31 @@ fn export_xes_rs(df: PyDataFrame, path: String) -> PyResult<()> {
         .map_err(|e| PyTypeError::new_err(format!("Failed to export XES: {e:?}")))
 }
 
+/// Import a Petri net from a PNML file
+///
+/// Returns a JSON encoding of the [PetriNet]
+///
+/// * `path` - The filepath of the .pnml file to import
+#[pyfunction]
+fn import_pnml_rs(path: String) -> PyResult<String> {
+    let net = PetriNet::import_pnml(&path)
+        .map_err(|e| PyErr::new::<pyo3::exceptions::PyException, _>(format!("Failed to import PNML: {e:?}")))?;
+    serde_json::to_string(&net)
+        .map_err(|e| PyTypeError::new_err(format!("Failed to serialize PetriNet: {e:?}")))
+}
+
+/// Export a Petri net to a PNML file
+///
+/// * `net_json` - A JSON encoding of the [PetriNet] (as returned by `import_pnml_rs`)
+/// * `path` - The filepath of the .pnml file to write
+#[pyfunction]
+fn export_pnml_rs(net_json: String, path: String) -> PyResult<()> {
+    let net: PetriNet = serde_json::from_str(&net_json)
+        .map_err(|e| PyTypeError::new_err(format!("Invalid PetriNet JSON: {e:?}")))?;
+    net.export_pnml(&path)
+        .map_err(|e| PyTypeError::new_err(format!("Failed to export PNML: {e:?}")))
+}
+
 /// Python Module
 #[pymodule]
 fn r4pm(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -91,6 +117,8 @@ fn r4pm(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(import_ocel_json_rs, m)?)?;
     m.add_function(wrap_pyfunction!(import_ocel_rs, m)?)?;
     m.add_function(wrap_pyfunction!(export_ocel_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(import_pnml_rs, m)?)?;
+    m.add_function(wrap_pyfunction!(export_pnml_rs, m)?)?;
 
     // Bindings support
     // list_bindings
@@ -204,9 +232,9 @@ fn call_binding(function_id: String, args_json: String, py: Python<'_>) -> PyRes
     let result = call(binding, &args, &state)
         .map_err(|e| PyTypeError::new_err(format!("Function call failed: {}", e)))?;
 
-    // Return result as JSON
-    serde_json::to_string(&result)
-        .map_err(|e| PyTypeError::new_err(format!("Failed to serialize result: {}", e)))
+    // result is JSON-encoded bytes already; hand back as UTF-8 text
+    String::from_utf8(result)
+        .map_err(|e| PyTypeError::new_err(format!("Result was not valid UTF-8: {}", e)))
 }
 
 /// Load a registry item from a file path

@@ -110,6 +110,41 @@ print(ocel['events'].shape)
 r4pm.df.export_ocel_pm4py(ocel_pm4py, "export.xml")
 ```
 
+### Petri Nets & Alignments
+
+A Petri net is a plain JSON-compatible dict (`r4pm.petri_net.PetriNet`). Import/export
+PNML, convert to/from PM4Py, and compute alignment-based fitness with the fast Rust
+alignment implementation.
+
+```python
+import pm4py
+import r4pm
+from r4pm import petri_net
+from r4pm.bindings.conformance.case_centric.alignments import align_variants, compute_fitness
+
+LOG = "test_data/Sepsis Cases - Event Log.xes.gz"
+
+# 1. Discover a Petri net with PM4Py (Inductive Miner infrequent, 0.2 noise threshold)
+log = pm4py.read_xes(LOG)
+net, im, fm = pm4py.discover_petri_net_inductive(log, noise_threshold=0.2)
+
+# 2. Convert the PM4Py net (+ markings) to an r4pm Petri net dict
+rnet = petri_net.from_pm4py(net, im, fm)
+# petri_net.export_pnml(rnet, "model.pnml")     # write PNML
+# rnet = petri_net.import_pnml("model.pnml")    # or read PNML directly
+
+# 3. Load the log into the registry
+log_id = r4pm.import_item("EventLog", LOG)
+
+# 4. Align all variants with the Rust binding and compute fitness
+#    (the EventLog id is auto-projected to activity variants)
+align_res = align_variants(rnet, log_id)
+fitness = compute_fitness(align_res, rnet)
+print(fitness)
+# {'log_fitness': 0.962, 'average_fitness': 0.907,
+#  'perfectly_fitting_frac': 0.626, 'total_costs': 573}
+```
+
 ## Development
 
 ### Setup

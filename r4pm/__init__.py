@@ -68,10 +68,15 @@ __all__ = [
     # "import_ocel_json_rs",
     # DataFrame submodule
     "df",
+    # Petri net (PNML) submodule
+    "petri_net",
     # Bindings submodule
     "bindings",
     "__version__",
 ]
+
+# No polars guard needed here (pure JSON), unlike df/bindings below
+from . import petri_net
 
 try:
     from . import df

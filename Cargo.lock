@@ -893,6 +893,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash 0.2.0",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1337,9 +1348,9 @@ dependencies = [
 
 [[package]]
 name = "macros_process_mining"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4864fe2ea22ec122ecee124e243bdb75e89733b04f2d3004ea32e78e3f56bcf6"
+checksum = "1f7e1aeb1ff280efbd58af4a543dd3f63984696234466ae4608aa2a6a72257dc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2145,13 +2156,14 @@ dependencies = [
 
 [[package]]
 name = "process_mining"
-version = "0.5.5"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64c5f48d81738ff65d3ac392ba3741c943764e3c3a34f8f85f3836b851737eb8"
+checksum = "dde42f23380f850d09b32bcdde81b25158b52a317551539c3f4157b05aaf4224"
 dependencies = [
  "chrono",
  "csv",
  "flate2",
+ "hashbrown 0.17.1",
  "inventory",
  "itertools",
  "macros_process_mining",
@@ -2161,6 +2173,7 @@ dependencies = [
  "quick-xml 0.37.5",
  "rayon",
  "rusqlite",
+ "rustc-hash",
  "schemars 1.2.0",
  "serde",
  "serde_json",
@@ -2611,9 +2624,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-hash"
-version = "2.1.1"
+version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
+checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
 
 [[package]]
 name = "rustix"
