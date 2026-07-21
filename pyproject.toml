@@ -7,10 +7,10 @@ name = "r4pm"
 description = "Rust-based Process Mining"
 readme="README.md"
 authors = [
-  {name = "Aaron Küsters", email = "kuesters@pads.rwth-aachen.de"},
+  {name = "Aaron Küsters", email = "r4pm@aarkue.eu"},
 ]
 keywords = ["process-mining", "process", "mining", "OC-DECLARE", "object-centric", "DECLARE"]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
