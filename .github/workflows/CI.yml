@@ -116,7 +116,9 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
         platform:
-          - runner: windows-latest
+          # Not windows-latest: it ships VS 2026 (MSVC 14.51), which removed
+          # stdext::checked_array_iterator, still used by the fmt vendored in bundled DuckDB.
+          - runner: windows-2022
             target: x64
     steps:
       - uses: actions/checkout@v4
@@ -126,6 +128,9 @@ jobs:
           architecture: ${{ matrix.platform.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        # libduckdb-sys only passes -std=c++11, which MSVC ignores, leaving it at C++14.
+        env:
+          CXXFLAGS: /std:c++17
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python${{ matrix.python-version }}
