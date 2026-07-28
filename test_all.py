@@ -184,16 +184,21 @@ def test_dataframe_roundtrip():
     
     events_before = dfs['events'].shape[0]
     objects_before = dfs['objects'].shape[0]
-    
+    changes_before = dfs['object_changes'].shape[0]
+
     new_ocel_id = r4pm.import_item_from_df('OCEL', dfs)
     new_dfs = r4pm.item_to_df(new_ocel_id)
-    
+
     events_after = new_dfs['events'].shape[0]
     objects_after = new_dfs['objects'].shape[0]
-    
+    changes_after = new_dfs['object_changes'].shape[0]
+
     assert events_before == events_after, f"Events mismatch: {events_before} vs {events_after}"
     assert objects_before == objects_after, f"Objects mismatch: {objects_before} vs {objects_after}"
-    print(f"✓ OCEL round-trip: {events_before} events, {objects_before} objects preserved")
+    # The objects DF holds the first value of each attribute, object_changes only the later ones;
+    # if both were re-imported as separate attributes, this would grow on every round-trip.
+    assert changes_before == changes_after, f"Object changes mismatch: {changes_before} vs {changes_after}"
+    print(f"✓ OCEL round-trip: {events_before} events, {objects_before} objects, {changes_before} object changes preserved")
     
     # EventLog round-trip
     log_id = r4pm.import_item('EventLog', 'test.xes')

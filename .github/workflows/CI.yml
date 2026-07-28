@@ -21,9 +21,7 @@ jobs:
         platform:
           - runner: ubuntu-22.04
             target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
-          - runner: ubuntu-22.04
+          - runner: ubuntu-22.04-arm
             target: aarch64
     steps:
       - uses: actions/checkout@v4
@@ -36,15 +34,19 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i python${{ matrix.python-version }}
           sccache: 'true'
-          manylinux: auto
+          # 2_28 (not auto/2014): bundled DuckDB needs a newer toolchain than the manylinux2014 image provides,
+          # and upstream DuckDB itself ships manylinux_2_26+ wheels only.
+          manylinux: '2_28'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.python-version }}-${{ matrix.platform.target }}
           path: dist
 
+  # Best-effort: bundled DuckDB on musl is untested upstream, so this job does not block the release.
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -52,8 +54,6 @@ jobs:
         platform:
           - runner: ubuntu-22.04
             target: x86_64
-          - runner: ubuntu-22.04
-            target: x86
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -82,11 +82,7 @@ jobs:
           - runner: ubuntu-22.04
             os: linux
             target: x86_64
-            manylinux: auto
-          - runner: ubuntu-22.04
-            os: linux
-            target: x86
-            manylinux: auto
+            manylinux: '2_28'
           - runner: macos-15-intel
             os: macos
             target: x86_64
@@ -122,8 +118,6 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-latest
-            target: x86
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

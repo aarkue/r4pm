@@ -233,19 +233,30 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         .unwrap(),
     ]);
 
+    // The first value of each object attribute is already exported in the objects DF (see above),
+    // so only the later values are changes. This matches PM4Py, whose object_changes DF also
+    // excludes the initial value.
+    let object_attribute_changes: Vec<_> = ocel
+        .objects
+        .iter()
+        .flat_map(|o| {
+            let mut seen: HashSet<&str> = HashSet::new();
+            o.attributes
+                .iter()
+                .filter(move |a| !seen.insert(a.name.as_str()))
+                .map(move |a| (o, a))
+        })
+        .collect();
+
     let mut object_changes_df = DataFrame::from_iter(
         object_attributes
             .into_iter()
             .map(|name| {
                 Series::from_any_values(
                     (&name).into(),
-                    ocel.objects
+                    object_attribute_changes
                         .iter()
-                        .flat_map(|o| {
-                            o.attributes.iter()
-                            // .filter(|a| a.time != DateTime::UNIX_EPOCH)
-                        })
-                        .map(|a| {
+                        .map(|(_o, a)| {
                             if a.name == name {
                                 ocel_attribute_val_to_any_value(&a.value)
                             } else {
@@ -261,56 +272,38 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
             .chain(vec![
                 Series::from_any_values(
                     OCEL_OBJECT_ID_KEY.into(),
-                    &ocel
-                        .objects
+                    &object_attribute_changes
                         .iter()
-                        .flat_map(|o| vec![o.id.clone(); o.attributes.len()])
-                        .map(|o_id| AnyValue::StringOwned(o_id.into()))
+                        .map(|(o, _a)| AnyValue::StringOwned(o.id.clone().into()))
                         .collect::<Vec<_>>(),
                     false,
                 )
                 .unwrap(),
                 Series::from_any_values(
                     OCEL_OBJECT_TYPE_KEY.into(),
-                    &ocel
-                        .objects
+                    &object_attribute_changes
                         .iter()
-                        .flat_map(|o| vec![o.object_type.clone(); o.attributes.len()])
-                        .map(|o_type| AnyValue::StringOwned(o_type.into()))
+                        .map(|(o, _a)| AnyValue::StringOwned(o.object_type.clone().into()))
                         .collect::<Vec<_>>(),
                     false,
                 )
                 .unwrap(),
                 Series::from_any_values(
                     OCEL_CHANGED_FIELD_KEY.into(),
-                    &ocel
-                        .objects
+                    &object_attribute_changes
                         .iter()
-                        .flat_map(|o| {
-                            o.attributes
-                                .iter()
-                                // .filter(|oa| oa.time != DateTime::UNIX_EPOCH)
-                                .map(|oa| oa.name.clone())
-                        })
-                        .map(|chngd_field_name| AnyValue::StringOwned(chngd_field_name.into()))
+                        .map(|(_o, a)| AnyValue::StringOwned(a.name.clone().into()))
                         .collect::<Vec<_>>(),
                     false,
                 )
                 .unwrap(),
                 Series::from_any_values(
                     OCEL_EVENT_TIMESTAMP_KEY.into(),
-                    &ocel
-                        .objects
+                    &object_attribute_changes
                         .iter()
-                        .flat_map(|o| {
-                            o.attributes
-                                .iter()
-                                // .filter(|oa| oa.time != DateTime::UNIX_EPOCH)
-                                .map(|oa| oa.time)
-                        })
-                        .map(|date| {
+                        .map(|(_o, a)| {
                             AnyValue::Datetime(
-                                date.timestamp_nanos_opt().unwrap(),
+                                a.time.timestamp_nanos_opt().unwrap(),
                                 TimeUnit::Nanoseconds,
                                 None,
                             )
