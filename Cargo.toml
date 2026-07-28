@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.6.1-alpha.1"
+version = "0.6.1-alpha.2"
 edition = "2021"
 rust-version = "1.88"
 build = "build.rs"
@@ -13,8 +13,10 @@ crate-type = ["cdylib"]
 [dependencies]
 process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], path = "../rust4pm/process_mining"}
-# Only here to statically link DuckDB (feature-unified into process_mining's duckdb dep), so wheels need no system libduckdb
-duckdb = {version = "1.2.1", features = ["bundled"]}
+# Only here to statically link DuckDB (feature-unified into process_mining's duckdb dep), so wheels need no system libduckdb.
+# >=1.10505 links the Windows system libs (ws2_32/rstrtmgr/bcrypt) and compiles with /EHsc on MSVC,
+# without which DuckDB errors abort the process instead of being raised (duckdb-rs #783).
+duckdb = {version = "1.10505.0", features = ["bundled"]}
 pyo3 = {version = "0.25", features = [ "extension-module", "abi3-py39"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
@@ -27,6 +29,6 @@ inventory = "0.3"
 
 [build-dependencies]
 serde_json = "1.0"
-# No ocel-duckdb here: build.rs only reads binding metadata, and this would compile DuckDB a second time for the host
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+duckdb = {version = "1.10505.0", features = ["bundled"]}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], path = "../rust4pm/process_mining"}
