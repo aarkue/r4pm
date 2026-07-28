@@ -15,7 +15,7 @@ process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duc
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], path = "../rust4pm/process_mining"}
 # Only here to statically link DuckDB (feature-unified into process_mining's duckdb dep), so wheels need no system libduckdb
 duckdb = {version = "1.2.1", features = ["bundled"]}
-pyo3 = {version = "0.25", features = [ "extension-module"]}
+pyo3 = {version = "0.25", features = [ "extension-module", "abi3-py39"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
 rayon = "1.7.0"

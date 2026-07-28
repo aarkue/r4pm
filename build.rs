@@ -23,6 +23,12 @@ fn main() {
     // Tell Cargo to rerun if these change
     println!("cargo:rerun-if-changed=build.rs");
 
+    // duckdb::AdditionalLockInfo calls the Restart Manager API, but libduckdb-sys never emits a
+    // link directive for it, so the symbols are only missing once this cdylib is linked.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        println!("cargo:rustc-link-lib=dylib=rstrtmgr");
+    }
+
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let bindings_dir = Path::new(&manifest_dir).join("r4pm").join("bindings");
 
