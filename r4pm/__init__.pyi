@@ -124,5 +124,17 @@ from . import df as df
 
 from . import petri_net as petri_net
 
+def has_feature(name: str) -> bool:
+    """Check whether an optional feature is compiled into this build.
+
+    Args:
+        name: Feature name, e.g. `"ocel-duckdb"`.
+    """
+    ...
+
 __all__: List[str]
 __version__: str
+__variant__: str
+"""`"full"` (r4pm-full) or `"default"` (r4pm)."""
+__features__: List[str]
+"""Optional features compiled in, e.g. `["full", "ocel-duckdb"]`."""

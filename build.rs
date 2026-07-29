@@ -23,6 +23,8 @@ fn main() {
     // Tell Cargo to rerun if these change
     println!("cargo:rerun-if-changed=build.rs");
 
+    generate_enabled_features();
+
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let bindings_dir = Path::new(&manifest_dir).join("r4pm").join("bindings");
 
@@ -895,4 +897,28 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union
 
     fs::write(bindings_dir.join("__init__.pyi"), stub_content)
         .expect("Failed to write bindings __init__.pyi");
+}
+
+/// Write enabled features to `OUT_DIR/enabled_features.rs`.
+///
+/// Cargo sets `CARGO_FEATURE_<NAME>` upper-cased with `-` as `_`; this crate's names use `-`.
+fn generate_enabled_features() {
+    let mut features: Vec<String> = std::env::vars()
+        .filter_map(|(key, _)| key.strip_prefix("CARGO_FEATURE_").map(str::to_string))
+        .map(|name| name.to_lowercase().replace('_', "-"))
+        .filter(|name| name != "default")
+        .collect();
+    features.sort();
+
+    let entries = features
+        .iter()
+        .map(|f| format!("    \"{f}\","))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let out = Path::new(&std::env::var("OUT_DIR").unwrap()).join("enabled_features.rs");
+    fs::write(
+        out,
+        format!("pub const ENABLED_FEATURES: &[&str] = &[\n{entries}\n];\n"),
+    )
+    .expect("Failed to write enabled_features.rs");
 }

@@ -25,6 +25,10 @@ from .r4pm import (
     list_bindings,
     call_binding,
     __version__,
+    # Build variant
+    __variant__,
+    __features__,
+    has_feature,
 )
 
 # item_to_df and import_item_from_df use PyDataFrame (pyo3-polars),
@@ -73,6 +77,10 @@ __all__ = [
     # Bindings submodule
     "bindings",
     "__version__",
+    # Build variant
+    "__variant__",
+    "__features__",
+    "has_feature",
 ]
 
 # No polars guard needed here (pure JSON), unlike df/bindings below

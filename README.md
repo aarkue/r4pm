@@ -11,6 +11,24 @@ This library provides basic import/export of XES/OCEL event data, as well as oth
 - **Registry System**: Manage data objects and convert between types as needed
 - **Polars DataFrames**: Polars facilitates the fast transfer of event data from Python to Rust and vice versa
 
+## Installation
+
+```bash
+pip install r4pm         # default
+pip install r4pm-full    # additionally bundles DuckDB (~15 MiB larger)
+```
+
+Both provide the `r4pm` import package, so install one or the other. `r4pm-full` adds the DuckDB
+bindings (`stream_ocel_to_duckdb`, `read_consolidated_ocel_from_duckdb`, ...), nothing else differs.
+
+```python
+import r4pm
+
+r4pm.__variant__                 # "default" or "full"
+r4pm.__features__                # optional features compiled in
+r4pm.has_feature("ocel-duckdb")
+```
+
 ## Quick Start
 
 ```python

@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.6.1-alpha.2"
+version = "0.6.1-alpha.3"
 edition = "2021"
 rust-version = "1.88"
 build = "build.rs"
@@ -10,13 +10,18 @@ build = "build.rs"
 name = "r4pm"
 crate-type = ["cdylib"]
 
+# Two distributions: `r4pm` (default) and `r4pm-full` (--features full). DuckDB is ~15 MiB/wheel.
+[features]
+default = []
+ocel-duckdb = ["process_mining/ocel-duckdb", "dep:duckdb"]
+full = ["ocel-duckdb"]
+
 [dependencies]
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
-# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], path = "../rust4pm/process_mining"}
-# Only here to statically link DuckDB (feature-unified into process_mining's duckdb dep), so wheels need no system libduckdb.
-# >=1.10505 links the Windows system libs (ws2_32/rstrtmgr/bcrypt) and compiles with /EHsc on MSVC,
-# without which DuckDB errors abort the process instead of being raised (duckdb-rs #783).
-duckdb = {version = "1.10505.0", features = ["bundled"]}
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], path = "../rust4pm/process_mining"}
+# Only here for `bundled` (feature-unified into process_mining's duckdb dep), so wheels need no
+# system libduckdb. >=1.10505 fixes the MSVC build: system libs + /EHsc (duckdb-rs #783).
+duckdb = {version = "1.10505.0", features = ["bundled"], optional = true}
 pyo3 = {version = "0.25", features = [ "extension-module", "abi3-py39"]}
 polars = {version = "0.51.0", features = ["dtype-slim","timezones","partition_by"]}
 pyo3-polars = {version = "0.24.0", features = ["dtype-struct"]}
@@ -29,6 +34,8 @@ inventory = "0.3"
 
 [build-dependencies]
 serde_json = "1.0"
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "ocel-duckdb"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
-duckdb = {version = "1.10505.0", features = ["bundled"]}
-# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite"], path = "../rust4pm/process_mining"}
+# Must mirror [dependencies]: build.rs generates the Python wrappers from the registry it sees
+# here, so a feature missing here drops those bindings from the wheel.
+process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+duckdb = {version = "1.10505.0", features = ["bundled"], optional = true}
+# process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], path = "../rust4pm/process_mining"}
