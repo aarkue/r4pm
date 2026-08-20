@@ -428,6 +428,8 @@ fn list_items(py: Python<'_>) -> PyResult<Vec<PyObject>> {
                     RegistryItem::IndexLinkedOCEL(_) => "IndexLinkedOCEL",
                     RegistryItem::SlimLinkedOCEL(_) => "SlimLinkedOCEL",
                     RegistryItem::EventLogActivityProjection(_) => "EventLogActivityProjection",
+                    RegistryItem::TabularSource(_) => "TabularSource",
+                    RegistryItem::Custom(custom) => custom.kind(),
                 };
                 dict.set_item("type", type_name)?;
                 Ok(dict.into())

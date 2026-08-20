@@ -512,8 +512,10 @@ fn generate_function_wrapper_with_types(
     let required_args: BTreeSet<&str> = func.required_args.iter().map(|s| s.as_str()).collect();
     let docs_url = function_docs_url(func);
 
-    // Build parameters
-    let mut params = Vec::new();
+    // Build parameters. Python requires all required (non-default) params before
+    // any optional ones, so emit required params first even if the schema interleaves them.
+    let mut required_params = Vec::new();
+    let mut optional_params = Vec::new();
     let mut doc_args = Vec::new();
     let mut dict_lines = vec!["    args_dict = {}".to_string()];
 
@@ -522,10 +524,10 @@ fn generate_function_wrapper_with_types(
         let is_required = required_args.contains(arg_name.as_str());
 
         if is_required {
-            params.push(format!("{}: {}", arg_name, arg_type));
+            required_params.push(format!("{}: {}", arg_name, arg_type));
             dict_lines.push(format!("    args_dict[\"{}\"] = {}", arg_name, arg_name));
         } else {
-            params.push(format!("{}: Optional[{}] = None", arg_name, arg_type));
+            optional_params.push(format!("{}: Optional[{}] = None", arg_name, arg_type));
             dict_lines.push(format!("    if {} is not None:", arg_name));
             dict_lines.push(format!(
                 "        args_dict[\"{}\"] = {}",
@@ -577,6 +579,7 @@ fn generate_function_wrapper_with_types(
     }
 
     let import_prefix = ".".repeat(import_depth);
+    let params: Vec<String> = required_params.into_iter().chain(optional_params).collect();
 
     format!(
         r#"def {py_name}({params}) -> {return_type}:
@@ -608,7 +611,10 @@ fn generate_function_stub_with_types(
     let required_args: BTreeSet<&str> = func.required_args.iter().map(|s| s.as_str()).collect();
     let docs_url = function_docs_url(func);
 
-    let mut params = Vec::new();
+    // Python requires all required (non-default) params before any optional ones,
+    // so emit required params first even if the schema interleaves them.
+    let mut required_params = Vec::new();
+    let mut optional_params = Vec::new();
     let mut doc_args = Vec::new();
 
     for (i, (arg_name, arg_schema)) in func.args.iter().enumerate() {
@@ -616,9 +622,9 @@ fn generate_function_stub_with_types(
         let is_required = required_args.contains(arg_name.as_str());
 
         if is_required {
-            params.push(format!("{}: {}", arg_name, arg_type));
+            required_params.push(format!("{}: {}", arg_name, arg_type));
         } else {
-            params.push(format!("{}: Optional[{}] = None", arg_name, arg_type));
+            optional_params.push(format!("{}: Optional[{}] = None", arg_name, arg_type));
         }
 
         if arg_schema.get("x-registry-ref").is_some() {
@@ -653,6 +659,8 @@ fn generate_function_stub_with_types(
     doc_lines.push("".to_string());
     doc_lines.push("    Returns:".to_string());
     doc_lines.push(format!("        {}", return_type));
+
+    let params: Vec<String> = required_params.into_iter().chain(optional_params).collect();
 
     format!(
         r#"def {py_name}({params}) -> {return_type}:

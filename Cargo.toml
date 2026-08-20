@@ -1,6 +1,6 @@
 [package]
 name = "r4pm"
-version = "0.6.1-alpha.3"
+version = "0.6.1"
 edition = "2021"
 rust-version = "1.88"
 build = "build.rs"
@@ -13,11 +13,11 @@ crate-type = ["cdylib"]
 # Two distributions: `r4pm` (default) and `r4pm-full` (--features full). DuckDB is ~15 MiB/wheel.
 [features]
 default = []
-ocel-duckdb = ["process_mining/ocel-duckdb", "dep:duckdb"]
+ocel-duckdb = ["process_mining/ocel-duckdb", "process_mining/extraction-dbcon-duckdb", "dep:duckdb"]
 full = ["ocel-duckdb"]
 
 [dependencies]
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+process_mining = {version = "0.6.1", features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay", "extraction-blueprint", "extraction-dbcon", "ocel-bundle", "ocel-bundle-parquet"]}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], path = "../rust4pm/process_mining"}
 # Only here for `bundled` (feature-unified into process_mining's duckdb dep), so wheels need no
 # system libduckdb. >=1.10505 fixes the MSVC build: system libs + /EHsc (duckdb-rs #783).
@@ -36,6 +36,6 @@ inventory = "0.3"
 serde_json = "1.0"
 # Must mirror [dependencies]: build.rs generates the Python wrappers from the registry it sees
 # here, so a feature missing here drops those bindings from the wheel.
-process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], git = "https://github.com/aarkue/rust4pm", branch = "feat/ocel-duckdb-streaming"}
+process_mining = {version = "0.6.1", features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay", "extraction-blueprint", "extraction-dbcon", "ocel-bundle", "ocel-bundle-parquet"]}
 duckdb = {version = "1.10505.0", features = ["bundled"], optional = true}
 # process_mining = {features = ["dataframes", "bindings", "ocel-sqlite", "log-splitting", "token-based-replay"], path = "../rust4pm/process_mining"}
