@@ -74,9 +74,8 @@ docs/_build/
 # Auto-generated files (created by build.rs during cargo build)
 r4pm/bindings/
 
-# Rust extension modules and stubs (built by maturin)
+# Rust extension modules (built by maturin)
 r4pm/*.so
-r4pm/r4pm.pyi
 
 # uv lock file
 uv.lock

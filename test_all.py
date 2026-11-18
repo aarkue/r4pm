@@ -18,7 +18,7 @@ def test_basic_workflow():
     print(f"✓ Loaded OCEL: {ocel_id[:30]}...")
     
     # Convert to SlimLinkedOCEL
-    locel_id = bindings.slim_link_ocel(ocel=ocel_id)
+    locel_id = r4pm.convert_item(ocel_id, 'SlimLinkedOCEL')
     print(f"✓ Converted to SlimLinkedOCEL: {locel_id[:30]}...")
     
     # Use analysis functions
@@ -51,10 +51,10 @@ def test_process_discovery():
     
     # Load and convert OCEL
     ocel_id = r4pm.import_item('OCEL', 'test_data/order-management.xml')
-    ocel_id = bindings.slim_link_ocel(ocel_id)
+    ocel_id = r4pm.convert_item(ocel_id, 'SlimLinkedOCEL')
     
     # DFG from SlimLinkedOCEL
-    dfg = bindings.discover_dfg_from_ocel(ocel_id)
+    dfg = bindings.discover_ocdfg(ocel_id)
     object_types = list(dfg['object_type_to_dfg'].keys())
     print(f"✓ DFG discovered for {len(object_types)} object types")
     print(f"  Types: {', '.join(object_types)}")
@@ -63,7 +63,7 @@ def test_process_discovery():
     slim_id = r4pm.import_item('SlimLinkedOCEL', 'test_data/order-management.xml')
     
     # Test with defaults (no options) - Rust provides default values
-    constraints = bindings.discover_oc_declare(locel=slim_id)
+    constraints = bindings.discover_oc_declare(ocel=slim_id)
     print(f"✓ Discovered {len(constraints)} OC-Declare constraints (using defaults)")
     
     # Also test with explicit options to verify both work
@@ -76,7 +76,7 @@ def test_process_discovery():
         "refinement": False,
         "considered_arrow_types": ["AS"]
     }
-    constraints_explicit = bindings.discover_oc_declare(locel=slim_id, options=options)
+    constraints_explicit = bindings.discover_oc_declare(ocel=slim_id, options=options)
     print(f"✓ Discovered {len(constraints_explicit)} OC-Declare constraints (with explicit options)")
     
     # Cleanup
@@ -159,7 +159,7 @@ def test_edge_cases():
     print(f"✓ Auto-generated ID: {ocel_id}")
     
     # Convert and verify
-    locel_id = bindings.slim_link_ocel(ocel=ocel_id)
+    locel_id = r4pm.convert_item(ocel_id, 'SlimLinkedOCEL')
     num1 = bindings.num_events(ocel=locel_id)
     num2 = bindings.num_events(ocel=locel_id)
     assert num1 == num2

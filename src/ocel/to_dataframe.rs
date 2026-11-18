@@ -8,6 +8,12 @@ use process_mining::{
 use pyo3_polars::PyDataFrame;
 
 use crate::ocel::{OCEL_CHANGED_FIELD_KEY, OCEL_EVENT_ID_KEY, OCEL_EVENT_TIMESTAMP_KEY, OCEL_EVENT_TYPE_KEY, OCEL_OBJECT_ID_2_KEY, OCEL_OBJECT_ID_KEY, OCEL_OBJECT_TYPE_KEY, OCEL_QUALIFIER_KEY, OCEL2DataFrames};
+
+fn df_from_series(series: impl IntoIterator<Item = Series>) -> DataFrame {
+    DataFrame::new_infer_height(series.into_iter().map(Column::from).collect())
+        .expect("all columns have one value per row")
+}
+
 fn ocel_attribute_val_to_any_value<'a>(
     val: &'a OCELAttributeValue,
 ) -> AnyValue<'a> {
@@ -55,7 +61,7 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         //     })
         // })
         // .collect();
-    let objects_df = DataFrame::from_iter(
+    let objects_df = df_from_series(
         object_attributes_initial
             .into_iter()
             .map(|name| {
@@ -120,7 +126,7 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         .map(|o| (&o.id, &o.object_type))
         .collect();
 
-    let mut e2o_df = DataFrame::from_iter(vec![
+    let mut e2o_df = df_from_series(vec![
         Series::from_any_values(
             OCEL_EVENT_ID_KEY.into(),
             &all_evs_with_rels
@@ -203,7 +209,7 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         })
         .collect();
 
-    let o2o_df = DataFrame::from_iter(vec![
+    let o2o_df = df_from_series(vec![
         Series::from_any_values(
             OCEL_OBJECT_ID_KEY.into(),
             &all_obj_with_rels
@@ -248,7 +254,7 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         })
         .collect();
 
-    let mut object_changes_df = DataFrame::from_iter(
+    let mut object_changes_df = df_from_series(
         object_attributes
             .into_iter()
             .map(|name| {
@@ -320,7 +326,7 @@ pub fn ocel2_to_df(ocel: &OCEL) -> OCEL2DataFrames {
         .flat_map(|et| &et.attributes)
         .map(|at| at.name.clone())
         .collect();
-    let mut events_df = DataFrame::from_iter(
+    let mut events_df = df_from_series(
         event_attributes
             .into_iter()
             .map(|name| {

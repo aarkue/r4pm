@@ -1,6 +1,8 @@
 from typing import Any, Dict, Optional
 import polars as pl
 
+from .._progress import ProgressOption
+
 # ============================================================================
 # XES Import/Export
 # ============================================================================
@@ -49,7 +51,7 @@ def rs_ocel_to_pm4py(ocel_rs: Dict[str, pl.DataFrame]) -> Any:
     """
     ...
 
-def import_ocel_xml(path: str) -> Dict[str, pl.DataFrame]:
+def import_ocel_xml(path: str, *, progress: ProgressOption = None) -> Dict[str, pl.DataFrame]:
     """
     Import OCEL2 from XML.
     
@@ -58,13 +60,13 @@ def import_ocel_xml(path: str) -> Dict[str, pl.DataFrame]:
     """
     ...
 
-def import_ocel_xml_pm4py(path: str) -> Any:
+def import_ocel_xml_pm4py(path: str, *, progress: ProgressOption = None) -> Any:
     """
     Import OCEL2 XML and convert to PM4PY format.
     """
     ...
 
-def import_ocel_json(path: str) -> Dict[str, pl.DataFrame]:
+def import_ocel_json(path: str, *, progress: ProgressOption = None) -> Dict[str, pl.DataFrame]:
     """
     Import OCEL2 from JSON.
     
@@ -73,22 +75,26 @@ def import_ocel_json(path: str) -> Dict[str, pl.DataFrame]:
     """
     ...
 
-def import_ocel_json_pm4py(path: str) -> Any:
+def import_ocel_json_pm4py(path: str, *, progress: ProgressOption = None) -> Any:
     """
     Import OCEL2 JSON and convert to PM4PY format.
     """
     ...
 
-def import_ocel(path: str) -> dict[str, pl.DataFrame]:
+def import_ocel(path: str, *, progress: ProgressOption = None) -> dict[str, pl.DataFrame]:
     """
     Import OCEL2 from File.
+
+    Reports its progress (for XML and JSON, stage "Importing" with the bytes read). Ctrl+C (or an
+    exception from the progress callback) cancels the import. `progress`: see `r4pm.set_progress`; None uses the global
+    setting, False shows none.
     
     Returns:
         Dict with DataFrames: 'events', 'objects', 'relations', 'o2o', 'object_changes'
     """
     ...
 
-def import_ocel_pm4py(path: str):
+def import_ocel_pm4py(path: str, *, progress: ProgressOption = None):
     """Import OCEL2 JSON and convert to PM4PY format."""
     ...
 

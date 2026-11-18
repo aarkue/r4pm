@@ -22,6 +22,17 @@ dynamic = ["version"]
 polars = [
   'polars[pandas, pyarrow]',
 ]
+pm4py = [
+  'pm4py',
+]
+progress = [
+  'tqdm',
+]
+test = [
+  'pytest',
+  'pm4py',
+  'polars[pandas, pyarrow]',
+]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
@@ -35,3 +46,8 @@ include = [
     { path = "r4pm/bindings/**/*.py", format = "wheel" },
     { path = "r4pm/bindings/**/*.pyi", format = "wheel" },
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# pm4py's alignments use numpy.matrix
+filterwarnings = ["ignore::PendingDeprecationWarning"]
