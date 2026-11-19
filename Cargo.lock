@@ -1971,9 +1971,9 @@ dependencies = [
 
 [[package]]
 name = "macros_process_mining"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63cf720596ec15a1bd269be7595d20206953e75baa82cdd9b7d9163fad706bfe"
+checksum = "fb645a726ed18af7a3dfb9a76ab3959a785f58cd5b7e1d2bf259cacc5607a3e2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3054,9 +3054,9 @@ dependencies = [
 
 [[package]]
 name = "process_mining"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c24dff7a0ad3b82a575efc57a13a2b52f5807702bb4514cc0be82b240c7a97"
+checksum = "be919e400388d9cc922b35d157f5550b612379d1a230cdc5c0e5e76a1d9cc22b"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -3274,7 +3274,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "r4pm"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "chrono",
  "inventory",

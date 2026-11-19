@@ -166,3 +166,18 @@ def test_missing_tqdm_is_explained(monkeypatch):
         r4pm.set_progress("tqdm")
     with pytest.raises(ImportError, match=r"r4pm\[progress\]"):
         bindings.num_events(ORDER_MANAGEMENT, progress="tqdm")
+
+
+def test_conformance_helpers_report_progress(log):
+    from r4pm import conformance
+
+    net = bindings.discover_inductive_net(log)
+    for compute in (conformance.alignments, conformance.fitness, conformance.precision):
+        reports = []
+        compute(log, net, progress=lambda *r: reports.append(r))
+        assert reports, compute.__name__
+
+    global_reports = []
+    r4pm.set_progress(lambda *r: global_reports.append(r))
+    conformance.fitness(log, net, progress=False)
+    assert global_reports == []

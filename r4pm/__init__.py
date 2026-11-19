@@ -47,6 +47,7 @@ from .r4pm import (
 )
 from . import _progress, handles
 from .handles import Handle
+from .svg import Svg
 from ._progress import ProgressCallback, ProgressOption, get_progress, set_progress
 
 
@@ -198,6 +199,7 @@ __all__ = [
     "Handle",
     "handles",
     "BindingError",
+    "Svg",
     # Progress
     "set_progress",
     "get_progress",

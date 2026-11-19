@@ -33,6 +33,16 @@ fn main() {
 
     generate_enabled_features();
 
+    let funcs = process_mining::bindings::list_functions_meta();
+
+    println!("cargo:rerun-if-env-changed=R4PM_EXPORT_DOCS_DIR");
+    // Export only, so that an export with other features (e.g., `full`) leaves the Python
+    // wrappers of the installed build alone
+    if let Ok(dir) = std::env::var("R4PM_EXPORT_DOCS_DIR") {
+        export_docs_data(Path::new(&dir));
+        return;
+    }
+
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let bindings_dir = Path::new(&manifest_dir).join("r4pm").join("bindings");
 
@@ -42,7 +52,7 @@ fn main() {
     fs::create_dir_all(&bindings_dir).expect("Failed to create bindings directory");
 
     let mut module_groups: BTreeMap<String, Vec<BindingMeta>> = BTreeMap::new();
-    for func in process_mining::bindings::list_functions_meta() {
+    for func in funcs {
         module_groups
             .entry(rust_module_to_python(&func.module))
             .or_default()
@@ -78,6 +88,64 @@ fn main() {
 
     generate_submodule_inits(&bindings_dir, &module_groups);
     generate_bindings_init(&bindings_dir, &module_groups, &types);
+}
+
+/// Writes the docs data of this build for r4pm-docs. A `full` build (`r4pm-full`) writes the
+/// binding metadata with shared schema definitions (`bindings-shared.json`) and the registry
+/// kinds with their file formats and conversions (`registry-kinds.json`). A default build
+/// (`r4pm`) writes the binding IDs and file formats it contains (`r4pm-contents.json`), so the
+/// docs can mark what needs `r4pm-full`.
+fn export_docs_data(dir: &Path) {
+    use process_mining::bindings::RegistryItemKind;
+    let kinds = RegistryItemKind::all_registered_kinds();
+    let files = if std::env::var_os("CARGO_FEATURE_FULL").is_some() {
+        let kinds: Vec<Value> = kinds
+            .iter()
+            .map(|k| {
+                serde_json::json!({
+                    "kind": k.name(),
+                    "import_formats": k.known_import_formats(),
+                    "export_formats": k.known_export_formats(),
+                    "convertible_to": k.convertible_to().iter().map(|t| t.name()).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+        vec![
+            (
+                "bindings-shared.json",
+                serde_json::to_value(process_mining::bindings::list_functions_meta_shared()),
+            ),
+            ("registry-kinds.json", serde_json::to_value(kinds)),
+        ]
+    } else {
+        let extensions = |formats: Vec<process_mining::core::io::ExtensionWithMime>| {
+            formats.into_iter().map(|f| f.extension).collect::<Vec<_>>()
+        };
+        let formats: serde_json::Map<String, Value> = kinds
+            .iter()
+            .map(|k| {
+                let formats = serde_json::json!({
+                    "import": extensions(k.known_import_formats()),
+                    "export": extensions(k.known_export_formats()),
+                });
+                (k.name().to_string(), formats)
+            })
+            .collect();
+        let bindings: Vec<String> = process_mining::bindings::list_functions_meta()
+            .into_iter()
+            .map(|f| f.id)
+            .collect();
+        vec![(
+            "r4pm-contents.json",
+            Ok(serde_json::json!({ "bindings": bindings, "formats": formats })),
+        )]
+    };
+    fs::create_dir_all(dir).expect("Failed to create R4PM_EXPORT_DOCS_DIR");
+    for (file, value) in files {
+        let json = serde_json::to_string_pretty(&value.expect("Failed to serialize docs data"))
+            .expect("Failed to serialize docs data");
+        fs::write(dir.join(file), json).expect("Failed to write docs data");
+    }
 }
 
 fn rust_module_to_python(rust_module: &str) -> String {
@@ -129,8 +197,13 @@ fn doc_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace("\"\"\"", "\\\"\\\"\\\"")
 }
 
-fn first_line(s: &str) -> &str {
-    s.lines().next().unwrap_or("")
+/// The first paragraph of a doc comment, on one line (doc comments are hard-wrapped)
+fn first_paragraph(s: &str) -> String {
+    s.lines()
+        .map(str::trim)
+        .take_while(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Every TypedDict of all bindings, by name. Each is written once, to `_types.py`.
@@ -242,7 +315,7 @@ impl TypeGen<'_> {
                 let desc = prop_schema
                     .get("description")
                     .and_then(|d| d.as_str())
-                    .map(|d| format!("  # {}", first_line(d)))
+                    .map(|d| format!("  # {}", first_paragraph(d)))
                     .unwrap_or_default();
                 (prop_name.clone(), ty, desc)
             })
@@ -609,6 +682,8 @@ struct FuncTypes {
     stores_kind: Option<String>,
     /// Registry kind of the result, if it is stored in the registry
     returns_kind: Option<String>,
+    /// Whether the wrapper returns the result as `Svg` (see `SVG_MEDIA_TYPE`)
+    returns_svg: bool,
     used: BTreeSet<String>,
 }
 
@@ -625,6 +700,10 @@ fn is_mut_arg(schema: &Value) -> bool {
 
 /// The keyword-only argument every wrapper adds, so no binding may have one by this name
 const PROGRESS_ARG: &str = "progress";
+
+/// Media type of the bindings returning an SVG document, which their wrappers return as
+/// `r4pm.svg.Svg`
+const SVG_MEDIA_TYPE: &str = "image/svg+xml";
 
 fn handle_type(kind: &str) -> String {
     format!("handles.{}", kind)
@@ -699,13 +778,19 @@ fn func_types(func: &BindingMeta, reg: &mut TypeRegistry) -> FuncTypes {
         })
         .collect();
     let returns_kind = registry_kind(&func.return_type);
-    let ret = match &returns_kind {
+    let mut ret = match &returns_kind {
         Some(kind) => handle_type(kind),
         None => {
             let hint = format!("{}Result", upper_camel(&func.name));
             gen.py_type(&func.return_type, &func.return_type, &hint)
         }
     };
+    let returns_svg = func.return_type.get("contentMediaType").and_then(Value::as_str)
+        == Some(SVG_MEDIA_TYPE);
+    if returns_svg {
+        assert_eq!(ret, "str", "SVG binding {} does not return a string", func.name);
+        ret = "Svg".to_string();
+    }
     let stores_kind = func.args.iter().find_map(|(name, schema)| {
         (name == "output_id")
             .then(|| schema.get("x-registry-out")?.as_str().map(str::to_string))
@@ -718,6 +803,7 @@ fn func_types(func: &BindingMeta, reg: &mut TypeRegistry) -> FuncTypes {
         mut_args,
         stores_kind,
         returns_kind,
+        returns_svg,
         used: gen.used,
     }
 }
@@ -767,7 +853,7 @@ fn signature(func: &BindingMeta, types: &FuncTypes) -> Signature {
                 )
             }
         } else if let Some(desc) = arg_schema.get("description").and_then(|d| d.as_str()) {
-            first_line(desc).to_string()
+            first_paragraph(desc)
         } else {
             arg_type.clone()
         };
@@ -836,15 +922,20 @@ fn generate_function_wrapper(func: &BindingMeta, types: &FuncTypes) -> String {
         Some(kind) => format!("{:?}", kind),
         None => "None".to_string(),
     };
+    let (open, close) = if types.returns_svg {
+        ("Svg(", ")")
+    } else {
+        ("", "")
+    };
     format!(
         r#"def {py_name}({params}) -> {ret}:
     """
 {doc}
     """
 {body}
-    return _call(
+    return {open}_call(
         {id:?}, args, registry_args=({registry_args}), returns={returns}, progress={progress}
-    )"#,
+    ){close}"#,
         params = sig.params,
         ret = types.ret,
         doc = sig.doc,
@@ -910,6 +1001,11 @@ fn generate_module_files(
 
     let all_types: Vec<FuncTypes> = functions.iter().map(|f| func_types(f, reg)).collect();
     let used: BTreeSet<String> = all_types.iter().flat_map(|t| t.used.clone()).collect();
+    let svg_import = if all_types.iter().any(|t| t.returns_svg) {
+        "from r4pm.svg import Svg\n"
+    } else {
+        ""
+    };
     let names: Vec<String> = functions.iter().map(|f| sanitize_name(&f.name)).collect();
     let all = format!(
         "__all__ = [\n{}]\n",
@@ -932,7 +1028,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from r4pm import handles
 from r4pm._progress import ProgressOption
-{extra_imports}{types}
+{svg_import}{extra_imports}{types}
 "#,
             types = type_imports(&used),
         )

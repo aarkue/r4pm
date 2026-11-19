@@ -23,6 +23,9 @@ net with its initial and final marking:
     aligned = conformance.alignments(log, net, im, fm)
     aligned[0]["alignment"]                         # [('a', 'a'), ('>>', None), ('b', '>>'), ...]
 
+Each function takes `progress=` (see `r4pm.set_progress`) for the bindings it calls, e.g.,
+`conformance.fitness(log, net, im, fm, progress="tqdm")`.
+
 pm4py is optional and only imported for converting pm4py nets.
 """
 from __future__ import annotations
@@ -45,10 +48,11 @@ from typing import (
     overload,
 )
 
-from . import handles, petri_net
+from . import _progress, handles, petri_net
 from . import r4pm as _native
 from .r4pm import BindingError
 from ._call import call as _call
+from ._progress import ProgressOption
 
 if TYPE_CHECKING:
     from typing_extensions import NotRequired, TypedDict
@@ -282,9 +286,11 @@ class Alignments(List[Optional[TraceAlignment]]):
     options: AlignmentOptions
     _raw: List[Dict[str, Any]]
 
-    def fitness(self, num_threads: Optional[int] = None) -> AlignmentFitness:
+    def fitness(
+        self, num_threads: Optional[int] = None, *, progress: ProgressOption = None
+    ) -> AlignmentFitness:
         """Alignment-based fitness from these alignments."""
-        return _fitness_from_raw(self._raw, self.net, self.options, num_threads)
+        return _fitness_from_raw(self._raw, self.net, self.options, num_threads, progress)
 
 
 # Inputs
@@ -358,7 +364,11 @@ def _projection(traces: Iterable[Sequence[str]]) -> Dict[str, Any]:
 
 
 def _resolve_log(
-    log: LogLike, activity_key: str, case_id_key: str, need_traces: bool
+    log: LogLike,
+    activity_key: str,
+    case_id_key: str,
+    need_traces: bool,
+    progress: ProgressOption = None,
 ) -> _Log:
     traces = _traces_from_object(log, activity_key, case_id_key)
     if traces is not None:
@@ -370,7 +380,12 @@ def _resolve_log(
         elif kind is not None:
             raise TypeError(f"Expected an event log, but '{log}' is a {kind}")
         elif os.path.exists(log):
-            handle = handles.EventLog(_native.import_item("EventLog", log), owned=True)
+            callback, done = _progress.resolve(progress)
+            try:
+                item = _native.import_item("EventLog", log, None, callback)
+            finally:
+                done()
+            handle = handles.EventLog(item, owned=True)
             resolved = _Log(handle, owned=[handle])
         else:
             raise FileNotFoundError(f"'{log}' is neither a registry ID nor an existing file")
@@ -450,19 +465,27 @@ def _moves(raw_moves: List[Dict[str, Any]], activities: List[str]) -> List[Move]
 
 
 def _align_raw(
-    log: _Log, net: petri_net.PetriNet, options: AlignmentOptions, num_threads: Optional[int]
+    log: _Log,
+    net: petri_net.PetriNet,
+    options: AlignmentOptions,
+    num_threads: Optional[int],
+    progress: ProgressOption,
 ) -> List[Dict[str, Any]]:
     return _call(
         _ALIGN_VARIANTS,
         {"net": net, "projection": log.ref, "options": options.to_json()},
         registry_args=("projection",),
         num_threads=num_threads,
+        progress=progress,
     )
 
 
-def _empty_trace_cost(net: petri_net.PetriNet, options: AlignmentOptions) -> Optional[int]:
+def _empty_trace_cost(
+    net: petri_net.PetriNet, options: AlignmentOptions, progress: ProgressOption
+) -> Optional[int]:
     try:
-        return _call(_ALIGN_TRACE, {"net": net, "trace": [], "options": options.to_json()})["cost"]
+        args = {"net": net, "trace": [], "options": options.to_json()}
+        return _call(_ALIGN_TRACE, args, progress=progress)["cost"]
     except _native.BindingError:
         # Then no trace aligns either, and each variant carries the error
         return None
@@ -497,6 +520,7 @@ def alignments(
     num_threads: Optional[int] = None,
     activity_key: str = "concept:name",
     case_id_key: str = "case:concept:name",
+    progress: ProgressOption = None,
 ) -> Alignments:
     """Optimal alignments of every trace of `log` on `net`.
 
@@ -511,6 +535,8 @@ def alignments(
         num_threads: Worker threads (default: all cores).
         activity_key: Activity column or attribute, for pm4py logs and DataFrames.
         case_id_key: Case ID column, for DataFrames.
+        progress: Progress display of the bindings called; see `r4pm.set_progress`. None uses
+            the global setting, False shows none.
 
     Returns:
         A list with one pm4py-shaped alignment per trace (`None` where the search failed), with
@@ -518,10 +544,11 @@ def alignments(
     """
     options = options or AlignmentOptions()
     resolved_net = _resolve_net(net, initial_marking, final_marking)
-    resolved_log = _resolve_log(log, activity_key, case_id_key, need_traces=True)
+    resolved_log = _resolve_log(log, activity_key, case_id_key, True, progress)
     try:
-        raw = _align_raw(resolved_log, resolved_net, options, num_threads)
-        variants = _variants(raw, _empty_trace_cost(resolved_net, options), options)
+        raw = _align_raw(resolved_log, resolved_net, options, num_threads, progress)
+        min_cost = _empty_trace_cost(resolved_net, options, progress)
+        variants = _variants(raw, min_cost, options)
         by_trace = {tuple(v.activities): v for v in variants}
         result = Alignments(by_trace[tuple(t)].as_pm4py() for t in resolved_log.get_traces())
     finally:
@@ -541,6 +568,7 @@ def _fitness_from_raw(
     net: petri_net.PetriNet,
     options: AlignmentOptions,
     num_threads: Optional[int],
+    progress: ProgressOption,
 ) -> AlignmentFitness:
     failed = next((v for v in raw if "Err" in v["result"]), None)
     if failed is not None:
@@ -552,6 +580,7 @@ def _fitness_from_raw(
         _COMPUTE_FITNESS,
         {"net": net, "alignments": raw, "options": options.to_json()},
         num_threads=num_threads,
+        progress=progress,
     )
     percentage = 100.0 * fit["perfectly_fitting_frac"]
     return {
@@ -577,6 +606,7 @@ def fitness(
     num_threads: Optional[int] = ...,
     activity_key: str = ...,
     case_id_key: str = ...,
+    progress: ProgressOption = ...,
 ) -> AlignmentFitness: ...
 
 
@@ -593,6 +623,7 @@ def fitness(
     num_threads: Optional[int] = ...,
     activity_key: str = ...,
     case_id_key: str = ...,
+    progress: ProgressOption = ...,
 ) -> TokenBasedFitness: ...
 
 
@@ -608,6 +639,7 @@ def fitness(
     num_threads: Optional[int] = None,
     activity_key: str = "concept:name",
     case_id_key: str = "case:concept:name",
+    progress: ProgressOption = None,
 ) -> Union[AlignmentFitness, TokenBasedFitness]:
     """Fitness of `log` on `net`.
 
@@ -628,25 +660,34 @@ def fitness(
         num_threads: Worker threads (default: all cores).
         activity_key: Activity column or attribute, for pm4py logs and DataFrames.
         case_id_key: Case ID column, for DataFrames.
+        progress: Progress display of the bindings called; see `r4pm.set_progress`. None uses
+            the global setting, False shows none.
     """
     if isinstance(log, Alignments) and alignments is None:
         alignments = log
     if method == "token_based":
         return _token_based_fitness(
-            log, net, initial_marking, final_marking, activity_key, case_id_key, num_threads
+            log,
+            net,
+            initial_marking,
+            final_marking,
+            activity_key,
+            case_id_key,
+            num_threads,
+            progress,
         )
     if method != "alignments":
         raise ValueError(f"Unknown fitness method {method!r}")
     if alignments is not None:
-        return alignments.fitness(num_threads)
+        return alignments.fitness(num_threads, progress=progress)
     options = options or AlignmentOptions()
     resolved_net = _resolve_net(net, initial_marking, final_marking)
-    resolved_log = _resolve_log(log, activity_key, case_id_key, need_traces=False)
+    resolved_log = _resolve_log(log, activity_key, case_id_key, False, progress)
     try:
-        raw = _align_raw(resolved_log, resolved_net, options, num_threads)
+        raw = _align_raw(resolved_log, resolved_net, options, num_threads, progress)
     finally:
         resolved_log.close()
-    return _fitness_from_raw(raw, resolved_net, options, num_threads)
+    return _fitness_from_raw(raw, resolved_net, options, num_threads, progress)
 
 
 def _token_based_fitness(
@@ -657,15 +698,17 @@ def _token_based_fitness(
     activity_key: str,
     case_id_key: str,
     num_threads: Optional[int],
+    progress: ProgressOption,
 ) -> TokenBasedFitness:
     resolved_net = _resolve_net(net, initial_marking, final_marking)
-    resolved_log = _resolve_log(log, activity_key, case_id_key, need_traces=False)
+    resolved_log = _resolve_log(log, activity_key, case_id_key, False, progress)
     try:
         result = _call(
             _TOKEN_REPLAY,
             {"net": resolved_net, "event_log": resolved_log.ref},
             registry_args=("event_log",),
             num_threads=num_threads,
+            progress=progress,
         )
     except BindingError as e:
         if "duplicate labels or silent transitions" in str(e):
@@ -713,6 +756,7 @@ def precision_result(
     num_threads: Optional[int] = None,
     activity_key: str = "concept:name",
     case_id_key: str = "case:concept:name",
+    progress: ProgressOption = None,
 ) -> PrecisionResult:
     """Escaping-edges precision of `net` with respect to `log`, with the counts behind it.
 
@@ -742,6 +786,7 @@ def precision_result(
             _PRECISION_FROM_ALIGNMENTS,
             {"net": alignments.net, "alignments": alignments._raw, "options": settings},
             num_threads=num_threads,
+            progress=progress,
         )
         return result
 
@@ -749,13 +794,14 @@ def precision_result(
     if not replay:
         settings["log_paths"] = {"Aligned": {"options": align_options.to_json()}}
     resolved_net = _resolve_net(net, initial_marking, final_marking)
-    resolved_log = _resolve_log(log, activity_key, case_id_key, need_traces=False)
+    resolved_log = _resolve_log(log, activity_key, case_id_key, False, progress)
     try:
         return _call(
             _PRECISION,
             {"net": resolved_net, "log": resolved_log.ref, "options": settings},
             registry_args=("log",),
             num_threads=num_threads,
+            progress=progress,
         )
     finally:
         resolved_log.close()
@@ -778,6 +824,7 @@ def precision(
     num_threads: Optional[int] = None,
     activity_key: str = "concept:name",
     case_id_key: str = "case:concept:name",
+    progress: ProgressOption = None,
 ) -> float:
     """Escaping-edges precision of `net` with respect to `log`.
 
@@ -807,6 +854,8 @@ def precision(
         num_threads: Worker threads (default: all cores).
         activity_key: Activity column or attribute, for pm4py logs and DataFrames.
         case_id_key: Case ID column, for DataFrames.
+        progress: Progress display of the bindings called; see `r4pm.set_progress`. None uses
+            the global setting, False shows none.
     """
     return precision_result(
         log,
@@ -824,4 +873,5 @@ def precision(
         num_threads=num_threads,
         activity_key=activity_key,
         case_id_key=case_id_key,
+        progress=progress,
     )["precision"]
